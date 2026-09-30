@@ -52,7 +52,10 @@ Given a city's GTFS data (multiple or not) and GHS-population data clipped to th
   - Esri world imagery
 
 
+
+## Contact
+
+- chiara.savoldi@dedagroup.it  
+- martina.forconi@dedagroup.it  
+
 ---
-
-
-
