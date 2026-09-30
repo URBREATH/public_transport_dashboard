@@ -1,0 +1,46 @@
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: 'Segoe UI', Roboto, sans-serif;
+  /* PATCH-LUCA "no-page-pinch-zoom-css-2026-08-05": barriera STRUTTURALE al
+     zoom-pagina da pinch trackpad, indipendente da preventDefault()/JS.
+     - touch-action: none -> il browser NON gestisce nativamente i gesti
+       pinch/pan sulla pagina, li lascia al contenuto (Leaflet).
+     - overscroll-behavior: none -> niente effetti di overscroll/zoom pagina.
+     Insieme al listener wheel+ctrlKey (registrato in runOutsideAngular) questo
+     copre il caso in cui il gesto avviene sopra un'immagine (imageOverlay del
+     layer Heatmap frequency), che il browser altrimenti interpreta come
+     "zoom dell'immagine/pagina". */
+  touch-action: none;
+  overscroll-behavior: none;
+}
+
+/* Il contenitore mappa e la sua immagine overlay non devono MAI essere
+   trattati come bersaglio di zoom/drag del browser. */
+#map, .leaflet-container {
+  touch-action: none;
+}
+.leaflet-container img,
+.freq-raster-smooth {
+  pointer-events: none;      /* i gesti passano alla mappa, non all'immagine */
+  -webkit-user-drag: none;
+  user-select: none;
+  touch-action: none;
+}
+
+
+/* PATCH-LUCA "pretty-popups": stile del contenitore dei popup mappa (.lz-popup).
+   I popup Leaflet sono renderizzati a livello document, quindi lo stile va qui
+   (CSS globale, non incapsulato nel component). */
+.lz-popup .leaflet-popup-content-wrapper {
+  border-radius: 12px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18);
+  padding: 2px 4px;
+}
+.lz-popup .leaflet-popup-content {
+  margin: 12px 14px;
+}
+.lz-popup .leaflet-popup-tip {
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18);
+}

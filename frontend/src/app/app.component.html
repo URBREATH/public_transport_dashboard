@@ -1,0 +1,996 @@
+<div class="app">
+  <header>
+    <h1>{{ cityName ? cityName + ' ' : '' }}public transport accessibility</h1>
+  </header>
+
+  <div class="body">
+    <aside>
+      <!-- PATCH-LUCA "unified-4-buttons":
+           Niente piu' intestazioni "Categoria"/"Layers". Un'unica lista
+           verticale di 4 pulsanti IDENTICI (stessa resa di Transport), uno
+           sotto l'altro, nell'ordine richiesto:
+             1) Transport         (categoria, invariato: apre i poligoni +
+                                    legenda "Walking time" fissa sotto)
+             2) Transport stop     (ex Transit stops)
+             3) Transport lines    (ex Transit lines — Livery)
+             4) Heatmap frequency  (ex Transit lines — Frequency)
+           I 3 layer aprono AUTOMATICAMENTE la loro legenda a comparsa quando
+           accesi; la freccia serve solo a richiuderla/riaprirla. -->
+
+      <!-- PATCH-LUCA "sidebar-reorder-2026-07-24":
+           Ordine richiesto dei pulsanti della sidebar:
+             1) Transport stop            (stops_clipped)
+             2) Transport lines           (heatmap_lines_livery)
+             3) Transport stop accessability  (CATEGORIA -> poligoni 15-min +
+                                               legenda "Walking time")
+             4) Heatmap frequency         (heatmap_lines_freq)
+             5) Transit deserts           (transit_deserts)
+             6) Population coverage        (pop_coverage_map)
+             7) Population 2025            (population_2025)
+           La CATEGORIA "Transport stop accessability" e' un blocco separato:
+           per collocarla in 3a posizione la lista layer e' SPLITTATA in
+           sidebarLayersTop (primi 2) e sidebarLayersRest (dal 3o). Il markup
+           del pill+legenda e' definito UNA sola volta in <ng-template #layerItem>
+           e riusato in entrambe le liste. -->
+
+      <!-- === 1-2) Primi 2 layer: Transport stop + Transport lines === -->
+      <ul class="layer-list">
+        <li *ngFor="let l of sidebarLayersTop" class="layer-item">
+          <ng-container *ngTemplateOutlet="layerItem; context: { $implicit: l }"></ng-container>
+        </li>
+      </ul>
+
+      <!-- === 3) TRANSPORT STOP ACCESSABILITY (categoria) ===
+           PATCH-LUCA "category-as-normal-pill" (2026-07-24):
+           la categoria e' ora un pulsante IDENTICO agli altri layer: riusa lo
+           STESSO <ng-template #layerItem> passando come contesto il LayerCfg
+           virtuale `categoryPill` (id 'transport'). Ha quindi la sua freccia
+           accordion e la legenda "Walking time" scende sotto quando la si
+           apre (NON piu' fissa nel riquadro viola .walking-legend). -->
+      <ul class="layer-list">
+        <li class="layer-item">
+          <ng-container *ngTemplateOutlet="layerItem; context: { $implicit: categoryPill }"></ng-container>
+        </li>
+      </ul>
+
+      <!-- === 4-5-6-7) Layer restanti: Heatmap frequency, Transit deserts,
+             Population coverage, Population 2025 === -->
+      <ul class="layer-list">
+        <li *ngFor="let l of sidebarLayersRest" class="layer-item">
+          <ng-container *ngTemplateOutlet="layerItem; context: { $implicit: l }"></ng-container>
+        </li>
+      </ul>
+
+      <!-- ============================================================
+           TEMPLATE UNICO del contenuto di ogni pulsante-layer (pill +
+           accordion legenda). Definito una volta e riusato da entrambe le
+           liste sopra tramite ngTemplateOutlet. 'l' = LayerCfg corrente.
+           ============================================================ -->
+      <ng-template #layerItem let-l>
+
+          <!-- Testata cliccabile: attiva/disattiva il layer (o la categoria).
+               PATCH-LUCA "category-as-normal-pill": pillIsOn/pillToggle
+               instradano al comportamento giusto in base a l.id ('transport'
+               = categoria; altrimenti layer standard). -->
+          <button
+            type="button"
+            class="layer-pill"
+            [class.on]="pillIsOn(l)"
+            (click)="pillToggle(l)"
+            [attr.aria-pressed]="pillIsOn(l)"
+          >
+            <!-- icona del layer (stessa resa di Transport) -->
+            <span class="pill-icon cat-icon" [innerHTML]="l.iconHtml"></span>
+
+            <span class="pill-label">{{ l.label }}</span>
+
+            <!-- freccia accordion (indipendente dal toggle) -->
+            <span
+              class="pill-caret"
+              [class.open]="isLegendOpen(l.id)"
+              (click)="onToggleLegend(l, $event)"
+              [attr.aria-expanded]="isLegendOpen(l.id)"
+              aria-label="Show legend"
+            >
+              <svg viewBox="0 0 12 12" width="10" height="10">
+                <path d="M2 4 L6 8 L10 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </span>
+          </button>
+
+          <!-- Accordion legenda (animato con grid-template-rows 0fr->1fr).
+               PATCH-LUCA "legend-accordion-smooth": il .legend-inner-wrap e'
+               il wrapper (overflow:hidden, min-height:0) richiesto dalla
+               tecnica grid-rows per animare all'altezza reale del contenuto. -->
+          <div class="legend-panel" [class.open]="isLegendOpen(l.id)">
+            <div class="legend-inner-wrap">
+            <div class="legend-inner" [class.legend-inner--naked]="l.id === 'transport'">
+
+              <!-- PATCH-LUCA "category-as-normal-pill":
+                   Legenda "Walking time (min)" della categoria Transport stop
+                   accessability, ora come contenuto normale dell'accordion
+                   (NON piu' nel riquadro viola .walking-legend). Scende sotto
+                   il pulsante quando lo si apre, riducibile come le altre. -->
+              <ng-container *ngIf="l.id === 'transport'">
+                <div class="legend-hint">Walking time (min)</div>
+                <div class="legend-bar"></div>
+                <!-- PATCH-LUCA "walking-legend-4bands-2026-09-09" (richiesta Luca):
+                     4 fasce nette (0-15 verde / 15-30 giallo / 30-60 rosso / >60
+                     grigio). Le etichette 15/30/60 sono posizionate in ASSOLUTO
+                     esattamente sotto le 3 linee di separazione (a 25/50/75%). -->
+                <div class="legend-labels-edges">
+                  <span style="left:25%">15</span>
+                  <span style="left:50%">30</span>
+                  <span style="left:75%">60</span>
+                </div>
+
+                <!-- PATCH-LUCA "transport-opacity-slider-2026-09-09" (richiesta Luca):
+                     BARRA DI SCORRIMENTO ORIZZONTALE (0-100%) sotto la legenda per
+                     regolare l'OPACITA' degli esagoni 15-min in mappa. Default = valore
+                     attuale (transportOpacity = 0.281 -> 28%). stopPropagation su click/
+                     input per NON toggle-are il pulsante/accordion mentre si trascina. -->
+                <div class="opacity-slider-row"
+                     (click)="$event.stopPropagation()">
+                  <span class="opacity-slider-label">Opacity</span>
+                  <input
+                    type="range"
+                    class="opacity-slider"
+                    min="0" max="100" step="1"
+                    [value]="transportOpacityPct"
+                    (input)="onTransportOpacityChange($event)"
+                    (click)="$event.stopPropagation()"
+                    aria-label="Layer opacity"
+                  />
+                  <span class="opacity-slider-value">{{ transportOpacityPct }}%</span>
+                </div>
+              </ng-container>
+
+              <!-- Legenda per TRANSIT STOPS -->
+              <!-- PATCH-LUCA "no-thematize-toggle": rimosso il toggle
+                   "Thematize". Aprendo la legenda si vedono DIRETTAMENTE le 4
+                   opzioni (radio): None (default) + le 3 tematizzazioni.
+                   Selezionandone una diversa da None, se il layer Transport
+                   stop e' spento viene acceso automaticamente. -->
+              <ng-container *ngIf="l.id === 'stops_clipped'">
+
+                <!-- PATCH-LUCA "stops-multimode": filtro per modo di trasporto.
+                     Checkbox Bus/Metro/Tram (solo per i modi realmente presenti
+                     in citta', availableStopModes). Spegnere un modo nasconde
+                     dalla mappa le fermate servite SOLO da quel modo; le fermate
+                     condivise (es. bus+tram) restano finche' almeno un loro modo
+                     e' acceso. -->
+                <div class="stop-mode-panel" *ngIf="availableStopModes.length > 1">
+                  <div class="legend-hint thematize-title">Service type</div>
+                  <ul class="theme-list">
+                    <li *ngFor="let m of availableStopModes" class="theme-row">
+                      <label class="theme-check">
+                        <input
+                          type="checkbox"
+                          [checked]="isStopModeOn(m)"
+                          (change)="toggleStopMode(m, $event)"
+                        />
+                        <!-- PATCH-LUCA "service-type-dot-only-when-mode" (rev5, richiesta Luca):
+                             DA SPENTO le scritte Bus/Metro/Tram devono stare piu' a
+                             SINISTRA (wrapper stretto/collassato); ACCENDENDO "service
+                             type" devono TRASLARE a destra per far posto al pallino.
+                             Quindi il wrapper .mode-dot-wrap e' stretto di default e
+                             diventa 16px solo con la classe .on (stopThemeMode === 'mode').
+                             Il .tier-dot interno (con *ngIf) appare colorato per modo. -->
+                        <span class="tier-dot-wrap mode-dot-wrap"
+                              [class.on]="stopThemeMode === 'mode'">
+                          <span class="tier-dot"
+                                *ngIf="stopThemeMode === 'mode'"
+                                [style.width.px]="12"
+                                [style.height.px]="12"
+                                [style.background]="modeColor(m)">
+                          </span>
+                        </span>
+                        <span class="theme-name">{{ m | titlecase }}</span>
+                      </label>
+                    </li>
+                  </ul>
+                </div>
+
+                <!-- Pannello con le 4 opzioni (radio, sempre visibile) -->
+                <div class="thematize-panel">
+                  <!-- PATCH-LUCA "restore-thematize-label": intestazione
+                       "Thematize" sopra l'elenco delle 4 opzioni. -->
+                  <div class="legend-hint thematize-title">Thematize</div>
+                  <ul class="theme-list">
+                    <li *ngFor="let th of visibleStopThemes" class="theme-row">
+                      <label class="theme-check">
+                        <input
+                          type="radio"
+                          name="stop-theme"
+                          [checked]="isStopTheme(th.key)"
+                          (change)="onSelectStopTheme(th.key, $event)"
+                        />
+                        <span class="theme-name">{{ th.label }}</span>
+                      </label>
+                    </li>
+                  </ul>
+
+                  <!-- Legenda dinamica: BY SERVICE TYPE (mode = bus/metro/tram)
+                       PATCH-LUCA "service-type-legend-removed" (richiesta Luca):
+                       la legenda "Color = transport mode serving the stop" NON
+                       deve piu' comparire sotto Thematize quando si seleziona
+                       "service type": la tematizzazione dei 3 pallini nella
+                       sezione "Service type" (sopra) e' gia' sufficiente.
+                       Blocco *ngIf="stopThemeMode === 'mode'" rimosso. -->
+
+                  <!-- Legenda dinamica: BY NUMBER OF LINES -->
+                  <ng-container *ngIf="stopThemeMode === 'lines'">
+                    <div class="legend-hint">Dot size = number of bus lines serving the stop</div>
+                    <ul class="tier-list">
+                      <li *ngFor="let t of STOP_TIERS" class="tier-row">
+                        <span class="tier-dot-wrap">
+                          <span class="tier-dot"
+                                [style.width.px]="t.legendRadius * 2"
+                                [style.height.px]="t.legendRadius * 2"
+                                [style.background]="t.color">
+                          </span>
+                        </span>
+                        <span class="tier-text">
+                          <span class="tier-name">{{ t.name }}</span>
+                          <span class="tier-desc">{{ t.desc }}</span>
+                        </span>
+                      </li>
+                    </ul>
+                  </ng-container>
+
+                  <!-- Legenda dinamica: BY STOP ROLE -->
+                  <ng-container *ngIf="stopThemeMode === 'role'">
+                    <div class="legend-hint">Color = role of the stop on the network</div>
+                    <ul class="tier-list">
+                      <li *ngFor="let t of STOP_ROLE_TIERS" class="tier-row">
+                        <span class="tier-dot-wrap">
+                          <span class="tier-dot"
+                                [style.width.px]="t.legendRadius * 2"
+                                [style.height.px]="t.legendRadius * 2"
+                                [style.background]="t.color">
+                          </span>
+                        </span>
+                        <span class="tier-text">
+                          <span class="tier-name">{{ t.name }}</span>
+                          <span class="tier-desc">{{ t.desc }}</span>
+                        </span>
+                      </li>
+                    </ul>
+                  </ng-container>
+
+                  <!-- Legenda dinamica: BY SERVICE TYPE -->
+                  <ng-container *ngIf="stopThemeMode === 'service'">
+                    <div class="legend-hint">Color = type of lines serving the stop</div>
+                    <ul class="tier-list">
+                      <li *ngFor="let t of STOP_SERVICE_TIERS" class="tier-row">
+                        <span class="tier-dot-wrap">
+                          <span class="tier-dot"
+                                [style.width.px]="t.legendRadius * 2"
+                                [style.height.px]="t.legendRadius * 2"
+                                [style.background]="t.color">
+                          </span>
+                        </span>
+                        <span class="tier-text">
+                          <span class="tier-name">{{ t.name }}</span>
+                          <span class="tier-desc">{{ t.desc }}</span>
+                        </span>
+                      </li>
+                    </ul>
+                  </ng-container>
+
+                  <!-- Legenda dinamica: BY STOP STATS (trip/daily/hourly/shapes)
+                       PATCH-LUCA "stop-stats-thematize": un unico blocco riusa
+                       activeStatTiers/activeStatHint per le 4 modalita' basate
+                       su stop_stats.json. -->
+                  <ng-container *ngIf="stopThemeMode === 'trip' || stopThemeMode === 'daily' || stopThemeMode === 'hourly' || stopThemeMode === 'shapes'">
+                    <div class="legend-hint">{{ activeStatHint }}</div>
+                    <ul class="tier-list">
+                      <li *ngFor="let t of activeStatTiers" class="tier-row">
+                        <span class="tier-dot-wrap">
+                          <span class="tier-dot"
+                                [style.width.px]="t.legendRadius * 2"
+                                [style.height.px]="t.legendRadius * 2"
+                                [style.background]="t.color">
+                          </span>
+                        </span>
+                        <span class="tier-text">
+                          <span class="tier-name">{{ t.name }}</span>
+                          <span class="tier-desc">{{ t.desc }}</span>
+                        </span>
+                      </li>
+                    </ul>
+                  </ng-container>
+
+                  <!-- Nessuna tematizzazione selezionata (None) -->
+                  <div class="legend-hint" *ngIf="stopThemeMode === 'uniform'">
+                    All stops shown in a single color. Pick an option above to color them.
+                  </div>
+                </div>
+
+              </ng-container>
+
+              <!-- Legenda per HEATMAP FREQUENCY (raster PNG) -->
+              <!-- PATCH-LUCA "freq-raster-overlay" (richiesta Luca): la Heatmap
+                   frequency mostra ora il RASTER PNG (heatmap a gradiente
+                   bianco->rosso scuro). La legenda e' una BARRA A GRADIENTE con
+                   il minimo a sinistra e il massimo a destra (meno passaggi ->
+                   piu' passaggi). -->
+              <ng-container *ngIf="l.id === 'heatmap_lines_freq'">
+                <div class="legend-hint">avg daily trips:</div>
+                <div class="freq-raster-legend">
+                  <div class="freq-raster-bar" [style.background]="freqRasterGradientCss"></div>
+                  <div class="freq-raster-labels">
+                    <span>{{ FREQ_RASTER_MIN_LABEL }}</span>
+                    <span>{{ FREQ_RASTER_MAX_LABEL }}</span>
+                  </div>
+                </div>
+              </ng-container>
+
+              <!-- PATCH-LUCA "grid5m-second-freq-layer-2026-08-24":
+                   Legenda del 2o layer "Heatmap frequency 5x5" (quadratini 5x5 m).
+                   Stessa barra a gradiente della heatmap (stessa palette), con
+                   nota che i quadratini compaiono zoomando e sono cliccabili. -->
+              <ng-container *ngIf="l.id === 'heatmap_lines_grid5m'">
+                <div class="legend-hint">daily trips per 5&times;5 m cell:</div>
+                <div class="freq-raster-legend">
+                  <div class="freq-raster-bar" [style.background]="freqRasterGradientCss"></div>
+                  <div class="freq-raster-labels">
+                    <span>{{ FREQ_RASTER_MIN_LABEL }}</span>
+                    <span>{{ FREQ_RASTER_MAX_LABEL }}</span>
+                  </div>
+                </div>
+                <div class="legend-hint">Zoom in to see the 5&times;5 m squares. Click a square for its daily trips.</div>
+              </ng-container>
+
+              <!-- PATCH-LUCA "heatmap-raster-tif-layer":
+                   Legenda del 3o layer "Heatmap raster" (PNG dal raster_heatmap.tif).
+                   Stessa barra a gradiente delle altre heatmap (palette bianco->
+                   rosso scuro). Layer indipendente, sovrapponibile agli altri. -->
+              <ng-container *ngIf="l.id === 'heatmap_raster'">
+                <!-- PATCH-LUCA "heatmap-freq-by-mode-2026-09-03" (richiesta Luca):
+                     menu "Service type" (radio, selezione singola) per scegliere
+                     il modo di trasporto della heatmap: Total / Metro / Tram /
+                     Bus. Stesso stile del menu "Service type" delle fermate.
+                     Compare solo se ci sono piu' modi disponibili nel JSON. -->
+                <div class="stop-mode-panel" *ngIf="hasMultipleHeatmapModes">
+                  <div class="legend-hint thematize-title">Service type</div>
+                  <ul class="theme-list">
+                    <li *ngFor="let hm of availableHeatmapModes" class="theme-row">
+                      <label class="theme-check">
+                        <input
+                          type="radio"
+                          name="heatmap-mode"
+                          [checked]="isHeatmapMode(hm.key)"
+                          (change)="onSelectHeatmapMode(hm.key, $event)"
+                        />
+                        <span class="theme-name">{{ hm.label }}</span>
+                      </label>
+                    </li>
+                  </ul>
+                </div>
+
+                <!-- Etichetta dinamica: "Total/Metro/Tram/Bus passages (avg daily trips):" -->
+                <div class="legend-hint">{{ heatmapModeHint }}</div>
+
+                <!-- Legenda a 5 classi Jenks del MODO selezionato: se il JSON
+                     soglie e' pronto uso heatmapModeClasses (soglie per-modo),
+                     altrimenti fallback su FREQ_LEGEND (soglie fisse storiche). -->
+                <ul class="freq-road-legend" *ngIf="heatmapModeClasses.length > 0">
+                  <li *ngFor="let c of heatmapModeClasses" class="freq-road-row">
+                    <span class="freq-road-line" [style.background]="'repeating-linear-gradient(to right, ' + c.color + ' 0 6px, transparent 6px 10px)'"></span>
+                    <span class="freq-road-text">
+                      <span class="freq-road-desc">{{ c.label }}</span>
+                    </span>
+                  </li>
+                </ul>
+                <ul class="freq-road-legend" *ngIf="heatmapModeClasses.length === 0">
+                  <li *ngFor="let g of FREQ_LEGEND" class="freq-road-row">
+                    <span class="freq-road-line" [style.background]="'repeating-linear-gradient(to right, ' + g.color + ' 0 6px, transparent 6px 10px)'"></span>
+                    <span class="freq-road-text">
+                      <span class="freq-road-name">{{ g.name }}</span>
+                      <span class="freq-road-desc">{{ g.desc }}</span>
+                    </span>
+                  </li>
+                </ul>
+              </ng-container>
+
+              <!-- Legenda per TRANSIT LINES — LIVERY (De Lijn official) -->
+              <ng-container *ngIf="l.id === 'heatmap_lines_livery'">
+                <!-- PATCH-LUCA "livery-hint-removed": legenda testuale rimossa su richiesta.
+               Prima c'era: "Each color = official De Lijn route color.
+               Grouped by hex value: the label lists the actual line numbers
+               using that color in this dataset." -->
+
+                <!-- PATCH-LUCA "livery-legend-select":
+                     ul.line-legend è cliccabile: cliccando lo SPAZIO VUOTO (non su
+                     una riga) si azzera il filtro (onResetLiveryFilter). Ogni riga
+                     è cliccabile (onSelectLiveryColor): seleziona/deseleziona quel
+                     colore; le righe NON selezionate diventano semi-trasparenti
+                     (classe .dimmed) mentre resta accesa solo quella cliccata. -->
+                <ul class="line-legend line-legend--selectable" (click)="onResetLiveryFilter()">
+                  <!-- PATCH-LUCA "lines-legend-by-mode-2026-09-01": le righe-colore
+                       sono RAGGRUPPATE per MODO (Bus / Metro / Tram). Ogni gruppo ha
+                       una INTESTAZIONE cliccabile che accende tutte le linee di quel
+                       modo (combinabile con gli altri modi). Le righe dentro il gruppo
+                       restano identiche a prima (espandibili + cliccabili). -->
+                  <ng-container *ngFor="let grp of LINE_LEGEND_GROUPS">
+
+                    <!-- Intestazione del modo: "Bus:" / "Metro:" / "Tram:" -->
+                    <li class="line-mode-header line-row--clickable"
+                        [class.on]="isLiveryModeSelected(grp.key)"
+                        (click)="onSelectLiveryMode(grp.key, $event)">
+                      {{ grp.label }}
+                    </li>
+
+                    <!-- Righe-colore del modo (identiche al comportamento precedente) -->
+                    <ng-container *ngFor="let g of grp.rows">
+                      <li class="line-row line-row--clickable line-row--in-mode"
+                          [class.dimmed]="isLegendModeRowDimmed(g, grp.key)"
+                          (click)="onSelectLiveryGroupRow(g, $event, grp.key)">
+                        <span class="line-swatch" [style.background]="g.color"></span>
+                        <span class="line-name">{{ g.name }}</span>
+                        <!-- freccetta di espansione: solo se la voce ha piu' linee -->
+                        <span *ngIf="isLegendRowExpandable(g.name)"
+                              class="line-caret"
+                              [class.open]="isLegendRowExpanded(g.color)"
+                              (click)="onToggleLegendExpand(g.color, $event)"
+                              [attr.aria-expanded]="isLegendRowExpanded(g.color)"
+                              aria-label="Expand lines">
+                          <svg viewBox="0 0 12 12" width="10" height="10">
+                            <path d="M2 4 L6 8 L10 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                          </svg>
+                        </span>
+                      </li>
+                      <!-- sotto-voci: singole linee, visibili solo se la riga e' espansa -->
+                      <ng-container *ngIf="isLegendRowExpanded(g.color)">
+                        <li *ngFor="let sub of legendSubLines(g.name)"
+                            class="line-row line-row--clickable line-subrow"
+                            [class.dimmed]="(selectedLiveryModes.size > 0 || selectedLiveryLineKeys.size > 0) && !isLiverySubLineSelected(sub, grp.key)"
+                            (click)="onSelectLiverySubLine(sub, g.color, $event)">
+                          <span class="line-swatch line-swatch--sub" [style.background]="g.color"></span>
+                          <span class="line-name">{{ sublineLabel(sub) }}</span>
+                        </li>
+                      </ng-container>
+                    </ng-container>
+
+                  </ng-container>
+
+                </ul>
+
+              </ng-container>
+
+              <!-- PATCH-LUCA "new-layers-coverage-deserts":
+                   Legenda per POPULATION COVERAGE (pct_covered, palette Purples
+                   a 5 fasce, colori 1:1 dal QML pop_coverage.qml). -->
+              <ng-container *ngIf="l.id === 'pop_coverage_map'">
+                <!-- PATCH-LUCA "coverage-thematize-uncovered-2026-08-09" (richiesta Luca):
+                     Il layer Population coverage ha DUE tematizzazioni, scelte col
+                     toggle "Thematize by population uncovered" sotto la legenda:
+                       - OFF (default): colore = % di popolazione coperta (pct_covered),
+                         palette Purples 5 fasce (COVERAGE_LEGEND).
+                       - ON: colore = N persone SCOPERTE per cella (pop_uncovered),
+                         palette Reds 5 fasce con soglie Natural Breaks (Jenks) di QGIS
+                         calcolate a runtime (UNCOVERED_LEGEND).
+                     La legenda (hint + swatch) cambia in base al toggle. -->
+
+                <!-- Legenda DEFAULT: % of population covered (Purples) -->
+                <ng-container *ngIf="!coverageThematizeUncovered">
+                  <div class="legend-hint">% of population covered by the public transport network</div>
+                  <ul class="line-legend">
+                    <li *ngFor="let g of COVERAGE_LEGEND" class="line-row">
+                      <span class="line-swatch" [style.background]="g.color"></span>
+                      <span class="line-name">{{ g.name }}</span>
+                    </li>
+                  </ul>
+                </ng-container>
+
+                <!-- Legenda ALTERNATIVA: N people uncovered per cell (Reds Jenks) -->
+                <ng-container *ngIf="coverageThematizeUncovered">
+                  <div class="legend-hint">People not covered by the public transport network (per cell)</div>
+                  <ul class="line-legend">
+                    <!-- PATCH-LUCA "coverage-uncovered-zero-transparent-2026-09-08"
+                         (richiesta Luca, rev2): la fascia 0 (range max = 0) in mappa e'
+                         resa QUASI trasparente (~10% opacita'). In legenda il suo swatch
+                         e' un QUADRATINO VUOTO: dentro NULLA (nessun riempimento), solo
+                         il bordo, per distinguerlo dalle fasce colorate. -->
+                    <li *ngFor="let g of UNCOVERED_LEGEND" class="line-row">
+                      <span class="line-swatch"
+                            *ngIf="g.range[1] === 0"
+                            style="background:transparent;box-shadow:inset 0 0 0 1px #cbd5e1"></span>
+                      <span class="line-swatch"
+                            *ngIf="g.range[1] !== 0"
+                            [style.background]="g.color"></span>
+                      <span class="line-name">{{ g.name }}</span>
+                    </li>
+                  </ul>
+                </ng-container>
+
+                <!-- Toggle (switch): tematizza per popolazione scoperta.
+                     PATCH-LUCA "coverage-uncovered-switch": vero interruttore
+                     (riusa .thematize-toggle/.thematize-switch/.thematize-knob
+                     come la legenda Transport stop), scritta leggermente piu'
+                     piccola (.coverage-uncovered-label). -->
+                <button
+                  type="button"
+                  class="thematize-toggle coverage-uncovered-toggle"
+                  [class.on]="coverageThematizeUncovered"
+                  (click)="onToggleCoverageUncovered($event)"
+                  [attr.aria-pressed]="coverageThematizeUncovered"
+                >
+                  <span class="thematize-switch"><span class="thematize-knob"></span></span>
+                  <span class="thematize-label coverage-uncovered-label">Thematize by population uncovered</span>
+                </button>
+              </ng-container>
+
+              <!-- PATCH-LUCA "new-layers-coverage-deserts":
+                   Legenda per TRANSIT DESERTS (simbolo unico rosso, come QML
+                   transit_deserts.qml). 'pop' = abitanti non serviti. -->
+              <ng-container *ngIf="l.id === 'transit_deserts'">
+                <div class="legend-hint">No bus stop in walking reach (400 m buffer from stops).</div>
+                <ul class="line-legend">
+                  <li class="line-row">
+                    <span class="line-swatch" [style.background]="DESERTS_STYLE.fill"></span>
+                    <span class="line-name">Transit desert area</span>
+                  </li>
+                </ul>
+              </ng-container>
+
+              <!-- PATCH-LUCA "population-2025-layer":
+                   Legenda per POPULATION 2025 (tasselli GHS-POP 100x100 m,
+                   palette YlOrRd->bordeaux a 6 fasce). Ogni cella e' cliccabile
+                   e mostra il numero di abitanti in un popup. -->
+              <ng-container *ngIf="l.id === 'population_2025'">
+                <div class="legend-hint">Inhabitants per 100 &times; 100 m cell (GHS-POP 2025). Click a cell for the exact count.</div>
+                <ul class="line-legend">
+                  <li *ngFor="let g of POP_LEGEND" class="line-row">
+                    <span class="line-swatch" [style.background]="g.color"></span>
+                    <span class="line-name">{{ g.name }}</span>
+                  </li>
+                </ul>
+              </ng-container>
+
+              <!-- PATCH-LUCA "ghsl-pop-tileserver":
+                   Legenda per il SECONDO "Population 2025" (tile server XYZ
+                   GHSL Copernicus). Nessun dato scaricato: il raster arriva
+                   on-demand dal tile server. Palette del prodotto GHS_POP. -->
+              <ng-container *ngIf="l.id === 'ghsl_pop_tiles'">
+                <div class="legend-hint">GHSL population Copernicus <br><strong class="___1qwroh2 fl43uef f19n0e5" data-lexical-text="true">GHS_POP_E2025_GLOBE_R2023A</strong></div>
+                <!-- PATCH-LUCA "ghsl-pop-legend-image" (richiesta Luca): legenda
+                     ufficiale GHS-POP come immagine (pop_legend.png negli assets),
+                     mostrata sotto il pulsante quando si apre la legenda. -->
+                <img src="assets/pop_legend.png" alt="GHSL population legend"
+                     style="display:block;max-width:50%;height:auto;margin-top:6px;border-radius:4px;" />
+              </ng-container>
+
+            </div>
+          </div>
+          </div>
+      </ng-template>
+    </aside>
+
+    <!-- PATCH-LUCA "charts-drawer":
+         Colonna destra = mappa (in alto, flessibile) + pannello grafici a
+         "tendina" (in basso, altezza variabile). La logica del drawer e'
+         copiata da esempio_sezione_grafici/dashboard_embedded.html (blocchi
+         .charts-panel + .charts-resize-handle + setupChartsResize):
+           - L'handle in cima al pannello si trascina su/giu per ridimensionare
+             (la mappa cede/guadagna spazio; il pannello cresce verso l'ALTO).
+           - Il pannello ha overflow-y:auto: mettendoci il cursore sopra si
+             SCROLLA verso il basso per consultarlo.
+           - Al termine del drag chiamo map.invalidateSize() cosi' Leaflet
+             ricalcola le dimensioni della mappa senza tile "tagliate".
+         NB: qui dentro NON metto grafici (come richiesto): solo il contenitore
+         scrollabile/trascinabile, pronto per ospitare i grafici in futuro. -->
+    <div class="map-col" (scroll)="onMapColScroll($event)">
+    <div id="map">
+      <!-- PATCH-LUCA "initial-loading-overlay-2026-09-14": rotella di caricamento
+           INIZIALE sulla mappa (stile identico alle altre dashboard: box quadrato
+           bianco + spinner viola + "Loading"). Sta come primo figlio di #map, quindi
+           copre SOLO la mappa (non tutta la pagina). Controllata da initialLoading:
+           parte true e diventa false quando il primo layer di dati compare in mappa
+           (o dopo un timeout di sicurezza). La transizione .is-hidden la fa svanire. -->
+      <div id="loadingOverlay" role="status" aria-live="polite"
+           [class.is-hidden]="!initialLoading">
+        <div class="loading-box">
+          <div class="loading-spinner" aria-hidden="true"></div>
+          <div class="loading-text">Loading</div>
+        </div>
+      </div>
+      <!-- PATCH-LUCA "grid5m-loading-spinner-2026-08-24" (richiesta Luca):
+           overlay con ROTELLA di caricamento + testo in inglese, mostrato SOLO
+           quando si passa dal PNG (da lontano) ai QUADRATINI 5x5 e finche' le
+           tessere non sono caricate (grid5mLoading = true). Centrato sulla
+           mappa, non intercetta i click (pointer-events:none). -->
+      <div class="grid5m-loading" *ngIf="grid5mLoading" aria-live="polite">
+        <div class="grid5m-loading-box">
+          <span class="grid5m-spinner" aria-hidden="true"></span>
+          <span class="grid5m-loading-text">Loading grid…</span>
+        </div>
+      </div>
+      <!-- PATCH-LUCA "map-top-right-btn" + "basemap-dropdown":
+           Pulsante tondo in alto a destra + dropdown a 4 opzioni con anteprima reale della mappa
+           (singola tile z=13 centrata su Leuven x=4202 y=2746 per ogni provider).
+           Ogni opzione: [anteprima 44x44 a sinistra] [nome mappa a destra].
+           L'opzione selezionata ha bordo/sfondo evidenziato.
+           Il tema del pulsante tondo (chiaro/scuro) e' guidato da isDarkBasemap. -->
+      <div class="basemap-switcher" id="mapTopRightSwitcher">
+        <div class="basemap-btn"
+             [class.basemap-btn--dark]="isDarkBasemap"
+             id="mapTopRightBtn"
+             title="Change base map"
+             (click)="toggleBasemapMenu($event)">
+          <svg width="28" height="26" viewBox="0 0 20 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <polygon points="10,1 19,5 10,9 1,5" fill="currentColor"/>
+            <polygon points="1,5 10,9 19,5 19,8 10,12 1,8" fill="currentColor" opacity="0.6"/>
+            <polygon points="1,8 10,12 19,8 19,11 10,15 1,11" fill="currentColor" opacity="0.35"/>
+          </svg>
+        </div>
+
+        <!-- Dropdown a blocchi: 4 pulsanti impilati verticalmente -->
+        <div class="basemap-menu"
+             [class.basemap-menu--open]="basemapMenuOpen"
+             (click)="$event.stopPropagation()">
+          <button *ngFor="let b of basemaps"
+                  type="button"
+                  class="basemap-option"
+                  [class.basemap-option--active]="b.id === activeBasemapId"
+                  (click)="selectBasemap(b.id)">
+            <span class="basemap-option__thumb"
+                  [style.background-image]="'url(' + b.thumbUrl + ')'"></span>
+            <span class="basemap-option__label">{{ b.label }}</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- PATCH-LUCA "focus-line-on-map":
+           Bottone tondo in basso a destra della mappa, visibile SOLO in focus
+           mode (focusActive). Freccia che punta verso il BASSO: premendolo si
+           torna al grafico "Top 10 busiest lines" e si ripristinano i layer
+           che c'erano prima. -->
+      <button
+        type="button"
+        class="focus-back-btn"
+        *ngIf="focusActive"
+        (click)="onFocusBackToChart()"
+        [title]="'Back to charts' + (focusLine ? ' (' + focusLine + ')' : '')"
+        aria-label="Back to charts">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none"
+             stroke="currentColor" stroke-width="2.2"
+             stroke-linecap="round" stroke-linejoin="round">
+          <path d="M6 9 L12 15 L18 9"/>
+        </svg>
+      </button>
+
+      <!-- PATCH-LUCA "freq-heatmap-strade" (richiesta Luca):
+           Info-box che compare in alto a sinistra sulla mappa quando si clicca
+           un ARCO STRADALE in modalita' "Heatmap frequency". L'arco cliccato
+           viene evidenziato in mappa (le altre spariscono) e qui si mostra il
+           NOME DELLA STRADA + la FREQUENZA ORARIA (corse/ora). La X in alto a
+           destra resetta la selezione (tutti gli archi tornano visibili). -->
+      <div class="freq-info-box" *ngIf="freqInfo">
+        <button type="button" class="freq-info-close"
+                (click)="resetFreqSelection()" aria-label="Close">&times;</button>
+        <div class="freq-info-title">{{ freqInfo.shapeName }}</div>
+        <div class="freq-info-subid">arco {{ freqInfo.shapeId }}</div>
+        <div class="freq-info-freq">
+          <span class="freq-info-freq-num" [style.color]="freqInfo.freqColor">{{ freqInfo.frequency }}</span>
+          <span class="freq-info-freq-unit">corse / ora</span>
+        </div>
+        <!-- PATCH-LUCA "freq-heatmap-strade": rimossi il blocco "Length" e
+             l'elenco linee. Per gli archi stradali si mostra solo il nome
+             della strada e la frequenza oraria. -->
+      </div>
+    </div>
+    <!-- /#map -->
+
+    <!-- === PANNELLO GRAFICI (scroll nativo) === -->
+    <div class="charts-panel">
+      <!-- Handle di resize: trascinabile su/giu (ns-resize) -->
+      <div
+        class="charts-resize-handle"
+        [class.dragging]="chartsDragging"
+        (mousedown)="startChartsResize($event)"
+        (touchstart)="startChartsResize($event)"
+        title="Drag to resize"
+      ></div>
+
+      <!-- Intestazione del pannello -->
+      <div class="charts-panel-header">
+        <span class="charts-panel-title">{{ cityName ? cityName + ' ' : '' }}Transport Analytics</span>
+      </div>
+
+      <!-- PATCH-LUCA "charts-sections-per-button":
+           Il corpo del pannello e' ora DATA-DRIVEN: una sezione per ogni
+           pulsante della sidebar (+ Transport). Ogni sezione ha un titolo,
+           un sottotitolo e una griglia con un numero PARI di grafici
+           (2/4/6) costruiti dai GeoJSON reali. I canvas hanno un attributo
+           [attr.data-cid] univoco: buildAllCharts() li recupera con
+           querySelector e vi istanzia i grafici Chart.js. -->
+      <div class="charts-panel-body">
+
+        <!-- PATCH-LUCA "analytics-kpi-metrics" (v3 minimal, stacked):
+             Riga di metriche in cima al pannello, TUTTE su una sola riga,
+             SENZA box individuali. Ogni metrica ha il NOME sopra e il
+             RISULTATO sotto (impilati). Le metriche sono separate solo da un
+             sottile divisore verticale "|" (.kpi-sep, non dopo l'ultima).
+             I valori arrivano da kpiMetrics (computeKpiMetrics). -->
+        <div class="kpi-metrics"
+             *ngIf="kpiMetrics.length"
+             [class.kpi-metrics--clickable]="hasKpiByMode"
+             (click)="toggleKpiExpand()"
+             [attr.role]="hasKpiByMode ? 'button' : null"
+             [attr.aria-expanded]="hasKpiByMode ? kpiExpanded : null"
+             [attr.title]="hasKpiByMode ? 'Click to see the breakdown by service type' : null">
+          <ng-container *ngFor="let m of kpiMetrics; let last = last">
+            <span class="kpi-item">
+              <span class="kpi-label">{{ m.label }}</span>
+              <span class="kpi-value">{{ m.value }}<span class="kpi-unit" *ngIf="m.unit"> {{ m.unit }}</span></span>
+            </span>
+            <span class="kpi-sep" *ngIf="!last">|</span>
+          </ng-container>
+
+          <!-- PATCH-LUCA "kpi-by-mode-2026-09-04": freccetta a destra della riga
+               KPI che indica che il blocco e' cliccabile e apre il breakdown
+               per service type. Ruota quando il menu e' aperto. -->
+          <span class="kpi-caret" *ngIf="hasKpiByMode" [class.open]="kpiExpanded"
+                aria-hidden="true">
+            <svg viewBox="0 0 12 12" width="11" height="11">
+              <path d="M2 4 L6 8 L10 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+        </div>
+
+        <!-- PATCH-LUCA "mode-agencies-collapsed-2026-11-09" (richiesta Luca):
+             Sotto la riga dei KPI (e SOLO quando la tabella per SERVICE TYPE e'
+             CHIUSA, cioe' !kpiExpanded) compare, per ogni modo realmente presente
+             (bus/metro/tram), una riga:
+                 bus:  <nome agenzia cliccabile col link agency_url>  <date range>
+                 metro: ...
+                 tram:  ...
+             Il nome/id dell'agenzia e' un LINK cliccabile verso il sito ufficiale
+             (agency_url), aperto in una NUOVA scheda, con la classe globale
+             .lz-line-link (hover viola + sottolineatura), esattamente come per
+             fermate e linee. Il tooltip nativo (title) mostra il nome completo
+             dell'agenzia. Il date range e' quello per-modo ("dd/mm/aaaa - dd/mm/aaaa").
+             Quando l'utente ESPANDE i KPI questo blocco si NASCONDE (resta la
+             tabella completa); richiudendo, riappare. I dati sono presi 1:1 dalle
+             stesse celle di kpi_by_mode via kpiModeAgencyCell()/kpiModeDateRange(). -->
+        <div class="kpi-mode-agencies"
+             *ngIf="hasKpiModeAgencies && !kpiExpanded">
+          <ng-container *ngFor="let row of kpiByMode!.rows">
+            <div class="kpi-mode-agency-row"
+                 *ngIf="kpiModeAgencyCell(row) as ag">
+              <span class="kpi-mode-agency-mode">{{ kpiModeLabel(row.mode) }}:</span>
+              <a *ngIf="ag.url"
+                 class="kpi-mode-agency-name lz-line-link"
+                 [href]="ag.url" target="_blank" rel="noopener noreferrer"
+                 [attr.title]="ag.tooltip ? ag.tooltip : null">{{ ag.tooltip ? ag.tooltip : ag.value }}</a>
+              <span *ngIf="!ag.url"
+                    class="kpi-mode-agency-name"
+                    [attr.title]="ag.tooltip ? ag.tooltip : null">{{ ag.tooltip ? ag.tooltip : ag.value }}</span>
+              <span class="kpi-mode-agency-range"
+                    *ngIf="kpiModeDateRange(row)">{{ kpiModeDateRange(row) }}</span>
+            </div>
+          </ng-container>
+        </div>
+
+        <!-- PATCH-LUCA "kpi-by-mode-2026-09-04": MENU A TENDINA con le KPI di
+             trasporto/rete separate per SERVICE TYPE (bus/metro/tram). Una
+             tabella: prima colonna = modo, poi una colonna per metrica. Si apre
+             cliccando la riga KPI sopra. Animato con grid-template-rows 0fr->1fr
+             (stessa tecnica delle legende sidebar). -->
+        <div class="kpi-bymode-panel" *ngIf="hasKpiByMode" [class.open]="kpiExpanded">
+          <div class="kpi-bymode-wrap">
+            <table class="kpi-bymode-table">
+              <thead>
+                <tr>
+                  <th class="kpi-bymode-modehead">Service type</th>
+                  <th *ngFor="let lbl of kpiByMode!.labels">{{ lbl }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let row of kpiByMode!.rows">
+                  <td class="kpi-bymode-mode">
+                    <span class="kpi-bymode-dot" [ngClass]="'kpi-bymode-dot--' + row.mode"></span>
+                    {{ kpiModeLabel(row.mode) }}
+                  </td>
+                  <!-- PATCH-LUCA "agencies-id-name-tooltip-2026-09-09" (richiesta Luca):
+                       ogni cella puo' avere un tooltip (campo c.tooltip). Per il KPI
+                       "Agencies" il valore mostrato e' l'agency_id (es. "CRTM"/"EMT") e
+                       il tooltip nativo (title) e' l'agency_name completo: passando col
+                       mouse sopra la cella si vede il nome. cursor:help solo se c'e' tooltip.
+                       PATCH-LUCA "agency-url-clickable-2026-11-09" (richiesta Luca): se la
+                       cella ha un url (campo c.url = agency_url letto da agency.txt), il
+                       valore (agency_id) diventa un LINK cliccabile verso il sito ufficiale
+                       dell'agenzia, aperto in una NUOVA SCHEDA, come gia' avviene per fermate
+                       e linee. Riuso la classe globale .lz-line-link (hover viola +
+                       sottolineatura). Se l'url manca, resta il testo semplice di prima. -->
+                  <td *ngFor="let c of row.cells"
+                      [attr.title]="c.tooltip ? c.tooltip : null"
+                      [class.kpi-bymode-cell--tip]="!!c.tooltip">
+                    <a *ngIf="c.url"
+                       class="kpi-bymode-val lz-line-link"
+                       [href]="c.url" target="_blank" rel="noopener noreferrer"
+                       (click)="$event.stopPropagation()">{{ c.value }}</a>
+                    <span *ngIf="!c.url" class="kpi-bymode-val">{{ c.value }}</span>
+                    <span class="kpi-bymode-unit" *ngIf="c.unit"> {{ c.unit }}</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <ng-container *ngFor="let sec of chartSections">
+        <div class="charts-section"
+             *ngIf="sec.title || sec.subtitle || sec.charts.length > 0">
+          <div class="charts-section-head" *ngIf="sec.title || sec.subtitle">
+            <span class="charts-section-title">{{ sec.title }}</span>
+            <span class="charts-section-sub">{{ sec.subtitle }}</span>
+          </div>
+
+          <div class="charts-grid">
+            <div class="chart-card"
+                 *ngFor="let ch of sec.charts"
+                 [class.chart-card--wide]="ch.wide">
+              <div class="chart-card-title">{{ ch.title }}</div>
+              <div class="chart-card-sub" *ngIf="ch.sub">{{ ch.sub }}</div>
+              <div class="chart-canvas-wrap" [class.chart-canvas-wrap--tall]="ch.tall">
+                <canvas [attr.data-cid]="sec.id + '__' + ch.id"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+        </ng-container>
+
+      </div>
+    </div>
+
+    </div>
+    <!-- /.map-col -->
+  </div>
+
+  <!-- ============================================================
+       PATCH-LUCA "schedule-board-overlay" (2026-07-24, sostituisce
+       "stop-schedule-panel"): OVERLAY GRANDE CENTRATO SOPRA LA MAPPA (info-box
+       stile tabellone di stazione), che si apre al click su una fermata.
+         - Header: nome/ID fermata + selettore SETTIMANA con frecce  <  >  +
+           pulsante chiudi.
+         - Corpo: per OGNI linea+direzione, un vero TABELLONE con
+             RIGHE   = tutte le fermate del percorso (capolinea->capolinea),
+                       con la fermata cliccata EVIDENZIATA;
+             COLONNE = le singole corse, con l'orario a ciascuna fermata.
+           Un tabellone per Feriale e uno per Sabato / Domenica-festivi.
+       ============================================================ -->
+  <div class="sched-overlay" *ngIf="schedulePanelOpen" (click)="closeStopSchedule()"></div>
+  <div class="sched-modal sched-modal--stopinfo" [class.open]="schedulePanelOpen" *ngIf="schedulePanelOpen">
+
+    <!-- Header con nome fermata, selettore settimana a frecce, chiudi -->
+    <div class="sched-head">
+      <div class="sched-head-text">
+        <!-- PATCH-LUCA "stopinfo-head-white-name-linked-2026-11-09" (richiesta Luca):
+             header bianco con scritte viola. Il NOME fermata e' sottolineato e, se la
+             fermata ha uno stop_url, e' un LINK cliccabile che porta alla pagina della
+             fermata (apre in nuova scheda). Se non c'e' url, resta testo sottolineato
+             non cliccabile. Sotto il nome, "stop id: (id)". -->
+        <a class="sched-stop-name sched-stop-name--link"
+           *ngIf="stopInfoView?.stop_url; else stopNamePlain"
+           [href]="stopInfoView?.stop_url" target="_blank" rel="noopener noreferrer">{{ scheduleStop?.name }}</a>
+        <ng-template #stopNamePlain>
+          <div class="sched-stop-name">{{ scheduleStop?.name }}</div>
+        </ng-template>
+        <div class="sched-stop-id" *ngIf="scheduleStop?.id">stop id: {{ scheduleStop?.id }}</div>
+      </div>
+
+      <!-- Selettore settimana: freccia sinistra, etichetta, freccia destra -->
+      <div class="sched-weeknav" *ngIf="scheduleWeeks.length">
+        <button type="button" class="sched-arrow"
+                (click)="prevScheduleWeek()"
+                [disabled]="scheduleWeekIdx === 0"
+                aria-label="Previous week">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
+               stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M15 5 L8 12 L15 19"/>
+          </svg>
+        </button>
+        <div class="sched-weeklabel">
+          <span class="sched-weeklabel-top">Week</span>
+          <span class="sched-weeklabel-main">{{ scheduleWeekLabel }}</span>
+        </div>
+        <button type="button" class="sched-arrow"
+                (click)="nextScheduleWeek()"
+                [disabled]="scheduleWeekIdx === scheduleWeeks.length - 1"
+                aria-label="Next week">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
+               stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 5 L16 12 L9 19"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- PATCH-LUCA "remove-dayselect" (2026-07-28): RIMOSSO su richiesta di Luca
+           il select box in alto a destra per la scelta del giorno della settimana
+           (.sched-daynav / .sched-dayselect). Resta solo il selettore di SETTIMANA
+           (.sched-weeknav, frecce < >), uno per ogni shape/tabellone. -->
+
+      <button type="button" class="sched-close" (click)="closeStopSchedule()" aria-label="Close">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M6 6 L18 18 M18 6 L6 18"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Nota periodo dati -->
+    <div class="sched-note" *ngIf="scheduleFeedValid">
+      Schedule from De Lijn GTFS feed &mdash; data available from
+      {{ scheduleFeedValid.start }} to {{ scheduleFeedValid.end }}.
+    </div>
+
+    <!-- Corpo scrollabile con i tabelloni -->
+    <!-- PATCH-LUCA "stop-info-panel-4numbers" (2026-09-02): il corpo del pannello
+         fermata NON mostra piu' i tabelloni orari. Mostra i 4 numeri della
+         fermata letti da stop_info.json (via stopInfoView):
+           - Lines               (numero di linee che servono la fermata)
+           - Shapes              (percorsi distinti)
+           - Avg frequency hourly(frequenza oraria media, trip/h)
+           - Total line          (numero di linee; ex "Weekly avg passages")
+         Se stopInfoView e' null (dati non disponibili) mostro un avviso. -->
+    <div class="sched-body">
+      <div class="sched-empty" *ngIf="!stopInfoView">
+        No data available for this stop.
+      </div>
+
+      <div class="stopinfo-panel" *ngIf="stopInfoView">
+        <!-- PATCH-LUCA "stopinfo-stats-on-top": i 2 box (freq oraria + passaggi
+             settimanali) vanno SOPRA; l'elenco delle linee sotto. -->
+        <div class="si-stats">
+          <div class="si-stat-box">
+            <div class="si-stat-label">Avg frequency hourly</div>
+            <div class="si-stat-value">{{ stopInfoView.freq_hourly | number:'1.0-1' }}<span class="si-stat-unit"> trip/h</span></div>
+          </div>
+          <!-- PATCH-LUCA "stopinfo-total-line-2026-09-02" (richiesta Luca):
+               al posto di "Weekly avg passages" (weekly_avg) mostro "Total line"
+               = numero di linee che servono la fermata (stopInfoView.lines). -->
+          <div class="si-stat-box">
+            <div class="si-stat-label">Total line</div>
+            <div class="si-stat-value">{{ stopInfoView.lines | number:'1.0-0' }}</div>
+          </div>
+        </div>
+
+        <!-- Elenco linee: una riga per linea, con le sue shape come lineette
+             del colore della linea. -->
+        <ul class="si-lines" dir="auto" *ngIf="stopInfoView.line_list?.length">
+          <ng-container *ngFor="let ln of stopInfoView.line_list">
+            <!-- Mostro la linea SOLO se ha almeno una shape; altrimenti salto. -->
+            <li *ngIf="ln.shapes?.length" class="si-line-row">
+              <!-- PATCH-LUCA "stopinfo-lines-only" (richiesta Luca): mostro SOLO
+                   la linea (trattino colorato + "linea N"). I nomi delle shape
+                   NON vengono piu' elencati sotto. -->
+              <!-- PATCH-LUCA "stopinfo-line-url-2026-11-09" (richiesta Luca): il
+                   nome della linea ("linea N") diventa un LINK cliccabile quando la
+                   linea ha un url (campo route_url del feed GTFS, aggiunto a
+                   line_list dalla pipeline). Se manca l'url resta testo semplice,
+                   identico a prima. Il link apre in nuova scheda. Stessa resa del
+                   link stop_url (.si-line-link). -->
+              <span class="si-line-name">
+                <span class="si-line-dash" [style.background]="ln.color || '#7a1fa2'"></span>
+                <a *ngIf="ln.url; else lineNamePlain"
+                   class="si-line-link"
+                   [href]="ln.url" target="_blank" rel="noopener noreferrer">linea {{ ln.line }}</a>
+                <ng-template #lineNamePlain>linea {{ ln.line }}</ng-template>
+              </span>
+            </li>
+          </ng-container>
+        </ul>
+
+        <!-- PATCH-LUCA "stopinfo-stop-url-moved-to-name-2026-11-09" (richiesta Luca):
+             il link della fermata NON e' piu' un pulsante "Stop link" in fondo al
+             pannello. Ora e' associato direttamente al NOME della fermata nell'header
+             (sottolineato e cliccabile). Blocco .si-stop-url rimosso. -->
+      </div>
+    </div>
+  </div>
+
+</div>
+

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pinch Test</title>
+<style>
+  html,body{margin:0;height:100%;font:14px/1.4 system-ui,sans-serif}
+  #log{position:fixed;top:0;left:0;right:0;bottom:0;overflow:auto;padding:12px;background:#0b1020;color:#b7f5c0}
+  .hit{color:#ffd166}.warn{color:#ff6b6b}.info{color:#7cc7ff}
+  h2{color:#fff;margin:0 0 8px}
+</style>
+</head>
+<body>
+<div id="log"><h2>Fai il PINCH col trackpad qui sopra. Ogni evento verra' loggato.</h2></div>
+<script>
+  const log = document.getElementById('log');
+  let n = 0;
+  function add(msg, cls){
+    n++;
+    const d = document.createElement('div');
+    d.className = cls || '';
+    d.textContent = '#' + n + '  ' + msg;
+    log.appendChild(d);
+    log.scrollTop = log.scrollHeight;
+  }
+  add('UserAgent: ' + navigator.userAgent, 'info');
+  add('Platform: ' + navigator.platform, 'info');
+
+  // wheel a livello WINDOW, passive:false -> provo preventDefault
+  window.addEventListener('wheel', function(e){
+    const canPrevent = !e.defaultPrevented;
+    let prevented = false;
+    if (e.ctrlKey){
+      try { e.preventDefault(); prevented = true; } catch(err){ add('preventDefault ERROR: '+err, 'warn'); }
+    }
+    add('WHEEL  ctrlKey=' + e.ctrlKey + '  deltaY=' + e.deltaY.toFixed(1) +
+        '  deltaMode=' + e.deltaMode + '  prevented=' + prevented,
+        e.ctrlKey ? 'hit' : '');
+  }, { passive: false });
+
+  // gesti Safari/WebKit
+  ['gesturestart','gesturechange','gestureend'].forEach(function(t){
+    window.addEventListener(t, function(e){
+      try{ e.preventDefault(); }catch(err){}
+      add('GESTURE ' + t + '  scale=' + (e.scale!==undefined?e.scale.toFixed(3):'?'), 'hit');
+    }, { passive:false });
+  });
+
+  // touch (mobile / touchscreen)
+  ['touchstart','touchmove','touchend'].forEach(function(t){
+    window.addEventListener(t, function(e){
+      add('TOUCH ' + t + '  touches=' + (e.touches?e.touches.length:'?'), 'hit');
+    }, { passive:false });
+  });
+
+  // rileva se la pagina viene comunque zoomata (visualViewport.scale cambia)
+  if (window.visualViewport){
+    window.visualViewport.addEventListener('resize', function(){
+      add('visualViewport.scale = ' + window.visualViewport.scale.toFixed(3) +
+          '  (se cambia = la PAGINA sta zoomando!)', 'warn');
+    });
+  }
+</script>
+</body>
+</html>

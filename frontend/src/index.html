@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>Public transport accessibility</title>
+  <base href="/">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no">
+  <!-- PATCH-LUCA "no-page-pinch-zoom-viewport-2026-08-05": maximum-scale=1 +
+       user-scalable=no impediscono al browser di zoomare l'intera pagina col
+       pinch del trackpad (stessa tecnica usata da Google Maps). Insieme a
+       touch-action:none (styles.css) e al listener wheel+ctrlKey in
+       runOutsideAngular (app.component.ts), il pinch zooma SOLO la mappa. -->
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <!-- Leaflet CSS -->
+  <!-- PATCH-LUCA "self-host-csp": risorse servite in locale (assets/vendor/) per
+       rispettare la Content-Security-Policy 'self' del server di pubblicazione
+       (VM Azure labora.dedagroup.it). NB path RELATIVI senza slash iniziale:
+       la dashboard e' pubblicata in sottocartella /URBREATH/Madrid/html/. -->
+  <link rel="stylesheet" href="assets/vendor/leaflet.css" />
+  <!-- Inter font -->
+  <link href="assets/vendor/inter.css" rel="stylesheet">
+  <!-- PATCH-LUCA "charts-drawer-content": Chart.js (stessa versione della
+       dashboard di esempio) caricato da CDN. Serve per i 2 grafici del
+       pannello a tendina: "Distribution (minutes)" e "Accessibility zones".
+       Lo carico qui (come gia' fatto per Leaflet) per non aggiungere una
+       dipendenza npm e non toccare la build. -->
+  <script src="assets/vendor/chart.umd.min.js"></script>
+  <!-- PATCH-LUCA "heatmap-raster-georaster": librerie per mostrare il vero
+       GeoTIFF (raster_heatmap.tif) direttamente nel browser, NITIDO come QGIS
+       a ogni zoom e INTERROGABILE (click -> valore del pixel = frequenza
+       giornaliera). georaster + georaster-layer-for-leaflet usano geotiff.js
+       per leggere pixel e metadati del .tif. Caricate da CDN come Leaflet/
+       Chart.js, senza toccare package.json/build. -->
+  <!-- PATCH-LUCA "heatmap-raster-georaster-fix-leaflet-global": georaster-layer-
+       for-leaflet cerca Leaflet come GLOBALE window.L al load dello script, ma
+       in Angular Leaflet e' importato come modulo (import * as L) -> window.L
+       NON esiste -> il plugin va in crash ("can't find Leaflet"). Carico quindi
+       il JS di Leaflet da CDN (stessa versione del CSS gia' presente) PRIMA dei
+       due script georaster, cosi' window.L esiste e il plugin lo trova. -->
+  <script src="assets/vendor/leaflet.js"></script>
+  <script src="assets/vendor/georaster.browser.bundle.min.js"></script>
+  <script src="assets/vendor/georaster-layer-for-leaflet.min.js"></script>
+</head>
+<body>
+  <app-root></app-root>
+</body>
+</html>

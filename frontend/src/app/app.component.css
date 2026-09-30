@@ -1,0 +1,3382 @@
+/* === Palette identica a dashboard_embedded.html (Deda/Leuven viola) === */
+:host {
+  display: block;
+  height: 100vh;
+
+  --bg: #ffffff;
+  --bg2: #f5f5f5;
+  --border: #53006c;         /* viola scuro Deda */
+  --border-light: #d0bada;   /* viola chiaro */
+  --text: #53006c;
+  --muted: #7a3a8a;
+  --accent: #53006c;
+  --active-bg: #6b2a85;      /* viola medio - stato .active */
+  --font: 'Inter', 'Segoe UI', Roboto, sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  font-family: var(--font);
+  color: var(--text);
+  background: var(--bg);
+}
+
+/* ── HEADER ── */
+header {
+  padding: 0 24px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border-bottom: 2px solid var(--border);
+  background: var(--bg);
+}
+header h1 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+header .subtitle {
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--muted);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* ── BODY ── */
+.body {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+aside {
+  width: 300px;
+  background: var(--bg);
+  border-right: 2px solid var(--border);
+  padding: 16px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  /* Scroll attivo ma barra MAI visibile (Firefox + IE/Edge legacy) */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+/* Scroll attivo ma barra MAI visibile (Chrome / Safari / Edge Chromium) */
+aside::-webkit-scrollbar { width: 0; height: 0; display: none; }
+
+aside h2 {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 18px 0 10px 0;
+}
+aside h2:first-child { margin-top: 0; }
+
+/* PATCH-LUCA "charts-scroll-native": colonna destra = mappa + pannello grafici.
+   MODELLO IDENTICO a esempio_sezione_grafici/dashboard_embedded.html (.main-content):
+   .map-col e' alta esattamente quanto la viewport sotto l'header (100vh - 52px)
+   e SCROLLA INTERNAMENTE (overflow-y:auto). Dentro ci sono #map (quasi tutto lo
+   schermo) + .charts-panel (altezza naturale) impilati: siccome insieme superano
+   la viewport, scrollando col cursore su questa colonna la MAPPA scorre via verso
+   l'alto e SALGONO i grafici da sotto. La sidebar (aside) ha il suo scroll a parte
+   e resta ferma. --charts-h controlla quanta mappa si vede prima di scrollare
+   (regolabile trascinando l'handle). */
+.map-col {
+  flex: 1;
+  min-width: 0;
+  --charts-h: 160px;
+  height: calc(100vh - 52px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  display: flex;
+  flex-direction: column;
+}
+.map-col::-webkit-scrollbar { width: 0; height: 0; display: none; }
+
+/* PATCH-LUCA "map-pinch-no-page-zoom-2026-08-05":
+   FIX: col trackpad il gesto PINCH sopra la mappa veniva interpretato dal
+   browser come ZOOM DI PAGINA (si ingrandiva tutta la dashboard) invece che
+   come zoom della sola mappa Leaflet. Si notava accendendo la Heatmap frequency
+   perche' quel layer (raster PNG grande + celle) rallenta la mappa e induce a
+   insistere col pinch. Con touch-action:none il gesto pinch/pan sopra il
+   contenitore mappa viene GESTITO da Leaflet e NON propagato al browser;
+   overscroll-behavior:contain evita che lo scroll "sfoghi" sulla pagina.
+   Cosi' sopra la mappa si zooma SEMPRE e SOLO la mappa. */
+#map,
+#map .leaflet-container,
+.leaflet-container {
+  touch-action: none;
+  overscroll-behavior: contain;
+}
+
+#map {
+  /* Mappa alta quasi quanto la viewport: cosi' all'avvio si vede quasi solo la
+     mappa e i grafici stanno "sotto la piega", raggiungibili scrollando giu'. */
+  width: 100%;
+  height: calc(100vh - 52px - var(--charts-h));
+  min-height: 120px;
+  flex-shrink: 0;
+  /* PATCH-LUCA "map-top-right-btn": rendo #map contenitore posizionale
+     cosi' che .basemap-switcher (position:absolute) si ancori all'angolo della MAPPA
+     (non del viewport). Leaflet aggiunge comunque position:relative al container in fase
+     di init, ma lo dichiaro esplicitamente per essere robusti prima dell'init. */
+  position: relative;
+}
+
+/* === PANNELLO GRAFICI ===
+   PATCH-LUCA "charts-scroll-native": il pannello NON ha piu' altezza fissa da JS.
+   Ha altezza NATURALE (quella dei suoi grafici) e sta impilato sotto #map dentro
+   .map-col (che scrolla). L'handle in cima resta e serve a regolare --charts-h
+   (quanta mappa vedi prima della piega). Lo scroll vero e' quello nativo di .map-col. */
+.charts-panel {
+  flex: 0 0 auto;
+  position: relative;
+  background: var(--bg);
+  border-top: 2px solid var(--border);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Handle per resize verticale del pannello grafici (barretta grigia in cima) */
+.charts-resize-handle {
+  position: absolute;
+  top: -6px;
+  left: 0;
+  right: 0;
+  height: 12px;
+  cursor: ns-resize;
+  z-index: 1005;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+}
+.charts-resize-handle::before {
+  content: '';
+  width: 48px;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  opacity: 0.55;
+  transition: opacity 0.15s, background 0.15s;
+}
+.charts-resize-handle:hover::before,
+.charts-resize-handle.dragging::before {
+  opacity: 1;
+  background: var(--active-bg);
+}
+/* Durante il drag: cursore ns-resize ovunque + niente selezione testo */
+:host-context(body.charts-resizing) * { cursor: ns-resize !important; }
+
+.charts-panel-header {
+  flex: 0 0 auto;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border-light);
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+.charts-panel-title {
+  font-weight: 700;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text);
+}
+.charts-panel-sub {
+  font-size: 10px;
+  color: var(--muted);
+}
+
+/* Corpo del pannello: altezza naturale (contiene la griglia dei grafici).
+   PATCH-LUCA "charts-scroll-native": niente scroll interno e niente flex-grow;
+   lo scroll e' quello nativo di .map-col. */
+.charts-panel-body {
+  flex: 0 0 auto;
+  padding: 12px 16px 24px 16px;
+}
+
+/* PATCH-LUCA "charts-sections-per-button":
+   Ogni sezione (una per pulsante sidebar) ha un'intestazione con titolo +
+   sottotitolo e una griglia di grafici sotto. Le sezioni sono separate da un
+   filo viola chiaro. */
+.charts-section { margin-bottom: 22px; }
+.charts-section + .charts-section {
+  padding-top: 18px;
+  border-top: 1px dashed var(--border-light);
+}
+.charts-section-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.charts-section-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text);
+}
+.charts-section-sub {
+  font-size: 10px;
+  color: var(--muted);
+}
+.chart-card-sub {
+  font-size: 9px;
+  color: var(--muted);
+  margin-top: -4px;
+}
+/* Una card che occupa l'intera larghezza (2 colonne) per grafici a barre
+   orizzontali con molte etichette (Top 10 ...). */
+.chart-card--wide { grid-column: 1 / -1; }
+/* Wrapper canvas piu' alto per i grafici con molte righe (Top 10). */
+.chart-canvas-wrap--tall { height: 300px; }
+
+/* PATCH-LUCA "charts-drawer-content":
+   Griglia dei 2 grafici (Distribution + Accessibility zones), replicata da
+   esempio_sezione_grafici/dashboard_embedded.html (.charts-grid + .chart-card
+   + .chart-card-title + .stat-row/.stat-chip). Due colonne affiancate; su
+   pannelli molto stretti passano una sotto l'altra. */
+.charts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  align-items: stretch;
+}
+@media (max-width: 720px) {
+  .charts-grid { grid-template-columns: 1fr; }
+}
+
+.chart-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border-light);
+  border-radius: 6px;
+  background: var(--bg);
+}
+
+.chart-card-title {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  flex-shrink: 0;
+}
+
+/* Riga con i 3 valori sintetici (average / min / max) del grafico Distribution */
+.stat-row {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.stat-chip {
+  flex: 1;
+  text-align: center;
+  padding: 4px 8px;
+  background: var(--bg2);
+  border: 1px solid var(--border-light);
+  border-radius: 4px;
+}
+.stat-chip .val {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.stat-chip .lbl {
+  font-size: 9px;
+  color: var(--muted);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+/* Wrapper del canvas: altezza fissa cosi' Chart.js (responsive) ha sempre uno
+   spazio noto in cui disegnare, anche quando il pannello e' basso. */
+.chart-canvas-wrap {
+  position: relative;
+  width: 100%;
+  height: 200px;
+  min-height: 0;
+}
+.chart-canvas-wrap canvas {
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+}
+/* === /PANNELLO GRAFICI A TENDINA === */
+
+/* ==========================================================================
+   PATCH-LUCA "map-top-right-btn":
+   Pulsante tondo in alto a destra sulla mappa (stile "Google Maps"), copiato
+   TALE E QUALE da dashboard_percorsi_embedded.html (blocchi .basemap-switcher
+   + .basemap-btn + .basemap-btn:hover + .basemap-btn--dark[:hover]).
+   Non modificare le proprieta' esistenti: e' una replica 1:1 del sorgente.
+   ========================================================================== */
+.basemap-switcher {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 1001;
+  transition: opacity 0.15s ease;
+}
+
+.basemap-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50% !important;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  padding: 0;
+  pointer-events: auto;
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.12s ease,
+    color 0.18s ease;
+  /* Tema CHIARO (carto/OSM): bianco-crema caldo, icona viola scuro */
+  background: rgba(250, 246, 252, 0.82);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+  backdrop-filter: blur(12px) saturate(140%);
+  border: 1px solid rgba(83, 0, 108, 0.20);
+  color: #3a1a4a;
+  box-shadow:
+    0 1px 2px rgba(40, 0, 60, 0.06),
+    0 6px 16px rgba(40, 0, 60, 0.10),
+    0 14px 32px rgba(40, 0, 60, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.65);
+}
+
+/* Tema SCURO per basemap satellitari/AGEA (palette viola scuro) */
+.basemap-btn--dark {
+  background: rgba(20, 12, 28, 0.42);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: #f3e8f7;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.18),
+    0 6px 18px rgba(0, 0, 0, 0.28),
+    0 18px 38px rgba(0, 0, 0, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+.basemap-btn:hover {
+  transform: translateY(-1px);
+  background: rgba(250, 246, 252, 0.95);
+  border-color: rgba(83, 0, 108, 0.38);
+  box-shadow:
+    0 2px 4px rgba(40, 0, 60, 0.08),
+    0 10px 22px rgba(40, 0, 60, 0.14),
+    0 18px 40px rgba(40, 0, 60, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.75);
+}
+.basemap-btn--dark:hover {
+  background: rgba(20, 12, 28, 0.58);
+  border-color: rgba(255, 255, 255, 0.35);
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.22),
+    0 10px 24px rgba(0, 0, 0, 0.34),
+    0 22px 44px rgba(0, 0, 0, 0.38),
+    inset 0 1px 0 rgba(255, 255, 255, 0.24);
+}
+
+/* Dimensione SVG interno (icona sara' aggiunta dopo) */
+.basemap-btn svg { width: 28px; height: 26px; display: block; }
+
+/* ==========================================================================
+   PATCH-LUCA "basemap-dropdown":
+   Dropdown a 4 blocchi impilati verticalmente, che appare sotto al pulsante
+   tondo (.basemap-btn). Ogni opzione:
+     [thumb 44x44 con anteprima reale di Leuven per quella basemap]  [nome]
+   L'opzione selezionata (.basemap-option--active) ha bordo/sfondo evidenziati.
+   Il menu e' nascosto di default e viene mostrato con .basemap-menu--open.
+   ========================================================================== */
+.basemap-menu {
+  position: absolute;
+  top: 56px;          /* 44px pulsante + 12px gap */
+  right: 0;
+  width: 220px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-radius: 14px;
+  background: rgba(250, 246, 252, 0.96);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  backdrop-filter: blur(14px) saturate(140%);
+  border: 1px solid rgba(83, 0, 108, 0.20);
+  box-shadow:
+    0 2px 4px rgba(40, 0, 60, 0.08),
+    0 10px 24px rgba(40, 0, 60, 0.14),
+    0 22px 48px rgba(40, 0, 60, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.65);
+  /* stato chiuso: nascosto */
+  opacity: 0;
+  transform: translateY(-6px) scale(0.98);
+  pointer-events: none;
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s ease;
+  z-index: 1000; /* sotto al pulsante (1001) per z-index del .basemap-switcher, ma sopra la mappa */
+}
+
+.basemap-menu--open {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+
+/* Singolo blocco/opzione */
+.basemap-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.55);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: #3a1a4a;
+  text-align: left;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.1s ease,
+    box-shadow 0.15s ease;
+}
+
+.basemap-option:hover {
+  background: rgba(255, 255, 255, 0.85);
+  border-color: rgba(83, 0, 108, 0.22);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(40, 0, 60, 0.10);
+}
+
+/* Stato SELEZIONATO */
+.basemap-option--active {
+  background: rgba(83, 0, 108, 0.10);
+  border-color: rgba(83, 0, 108, 0.55);
+  box-shadow:
+    0 0 0 1px rgba(83, 0, 108, 0.35) inset,
+    0 4px 12px rgba(83, 0, 108, 0.18);
+  font-weight: 700;
+}
+
+.basemap-option--active:hover {
+  background: rgba(83, 0, 108, 0.14);
+}
+
+/* Thumbnail: anteprima reale della mappa (background-image = tile del provider) */
+.basemap-option__thumb {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-color: rgba(83, 0, 108, 0.08); /* fallback se la tile non carica */
+  border: 1px solid rgba(83, 0, 108, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.4);
+}
+
+.basemap-option--active .basemap-option__thumb {
+  border-color: rgba(83, 0, 108, 0.55);
+}
+
+/* Label a destra */
+.basemap-option__label {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+
+/* ── PULSANTI CATEGORIA (identici a dashboard_embedded) ── */
+/* PATCH-LUCA "only-transport-category" + "cat-btn-long":
+   ora c'e' una sola categoria (Transport) e i pulsanti sono LUNGHI (uno per
+   riga, full-width) con icona a sinistra e testo accanto, coerenti con i
+   pulsanti layer sottostanti. */
+.cat-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.cat-btn {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border-light);
+  padding: 10px 12px;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    background 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+    color 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  border-radius: 8px;
+}
+.cat-btn:hover {
+  /* PATCH-LUCA "cat-btn-hover-like-basemap":
+     Hover NON piu' "sgrigiato" (var(--bg2)) ma stile identico a
+     .basemap-option:hover: sfondo bianco piu' saturo, bordo viola tenue,
+     lift di 1px e ombra sottile. Coerente con lo stile "glass" del resto
+     dei pulsanti mappa. */
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(83, 0, 108, 0.22);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(40, 0, 60, 0.10);
+}
+.cat-btn.active {
+  /* PATCH-LUCA "cat-btn-active-like-basemap" (toned down):
+     Stato attivo con stile "glass" (sfondo bianco-crema, testo viola scuro),
+     visibile ma NON invasivo. Rispetto alla versione precedente:
+     - border 1.5px (era 2px) e piu' tenue: rgba(83,0,108,0.65) invece di solido pieno
+     - outline rimosso (era 3px viola -> troppo "acceso")
+     - font-weight 600 (era 700)
+     - lift ridotto (transform meno pronunciata: box-shadow piu' sottile)
+     Cosi' si distingue chiaramente dallo stato hover ma senza urlare. */
+  background: rgba(250, 246, 252, 0.98);
+  border: 2px solid rgba(83, 0, 108, 0.65);
+  padding: 9px 11px;  /* compensa i +1px di border per non far saltare il layout */
+  color: var(--text);
+  font-weight: 600;
+  box-shadow:
+    0 1px 3px rgba(40, 0, 60, 0.08),
+    0 3px 8px rgba(83, 0, 108, 0.10),
+    inset 0 1px 0 rgba(255, 255, 255, 0.75);
+}
+
+/* Contenitore icona */
+.cat-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  color: inherit; /* eredita il colore del pulsante, poi passato a stroke via currentColor */
+}
+
+/* Icona SVG - PATCH-LUCA icons-fix:
+   le SVG vengono iniettate via [innerHTML], quindi Angular NON aggiunge
+   loro l'attributo _ngcontent-* e il CSS scoped del componente NON le
+   colpisce. Serve ::ng-deep per bucare l'encapsulation.
+   In piu' fisso stroke=currentColor e fill=none esplicitamente perche'
+   alcuni user agent ignorano gli attributi presentation-only sugli
+   elementi figli quando l'SVG e' inline via innerHTML. */
+::ng-deep .cat-icon-svg {
+  width: 22px !important;
+  height: 22px !important;
+  display: block;
+  color: inherit;
+  stroke: currentColor;
+  fill: none;
+}
+::ng-deep .cat-icon-svg path,
+::ng-deep .cat-icon-svg rect,
+::ng-deep .cat-icon-svg circle,
+::ng-deep .cat-icon-svg line,
+::ng-deep .cat-icon-svg polyline,
+::ng-deep .cat-icon-svg polygon {
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.5;
+  stroke-linecap: square;
+  stroke-linejoin: miter;
+  vector-effect: non-scaling-stroke;
+}
+
+/* ── LEGENDA (barra a fasce discrete) ──
+   PATCH-LUCA "walking-legend-4bands-2026-09-09" (richiesta Luca):
+   La legenda "Walking time (min)" NON e' piu' un gradiente sfumato, ma 4 FASCE
+   NETTE (bande discrete) con gli STESSI colori pieni degli esagoni della mappa
+   (COLOR_STOPS_15 nel .ts):
+     0-15   -> verde  #22c55e  (uguale all'esagono "<=15 min")
+     15-30  -> giallo #fde047  (uguale all'esagono "15-30 min")
+     30-60  -> rosso  #f87171  (uguale all'esagono "30-60 min")
+     >60    -> grigio #9ca3af  (celle oltre i 60 min / senza servizio)
+   Le 4 bande sono UGUALI (25% ciascuna) cosi' le etichette 0/15/30/60+ sotto
+   cadono esattamente sui confini delle fasce. */
+.legend-bar {
+  height: 18px;
+  background: linear-gradient(90deg,
+              #22c55e 0%,    #22c55e 25%,
+              #fde047 25%,   #fde047 50%,
+              #f87171 50%,   #f87171 75%,
+              #9ca3af 75%,   #9ca3af 100%);
+  border: 1px solid rgba(83, 0, 108, 0.18);
+  border-radius: 999px;
+  overflow: hidden;
+  position: relative;
+  box-shadow:
+    inset 0 1px 2px rgba(83, 0, 108, 0.10),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.35),
+    0 1px 2px rgba(83, 0, 108, 0.05);
+}
+/* Riflesso lucido superiore (effetto vetro) */
+.legend-bar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg,
+              rgba(255, 255, 255, 0.18) 0%,
+              rgba(255, 255, 255, 0.04) 45%,
+              rgba(255, 255, 255, 0) 60%,
+              rgba(0, 0, 0, 0.04) 100%);
+  pointer-events: none;
+}
+.legend-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 4px;
+  letter-spacing: 0.05em;
+}
+/* PATCH-LUCA "walking-legend-4bands-2026-09-09" (richiesta Luca):
+   4 fasce nette; le etichette 15/30/60 devono cadere ESATTAMENTE (centrate)
+   sotto le 3 linee di separazione della barra (a 25% / 50% / 75%).
+   Contenitore RELATIVO + ogni etichetta ASSOLUTA con left preciso e
+   translateX(-50%) per centrarla sul confine. */
+.legend-labels-edges {
+  position: relative;
+  height: 14px;
+  margin-top: 4px;
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0.05em;
+}
+.legend-labels-edges span {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+/* ── TOGGLE LAYER (pill + accordion) ── */
+/* PATCH-LUCA "sidebar-english-accordion":
+   Non piu' checkbox: ogni layer e' una "pill" cliccabile che si accende
+   (attivo = viola pieno) o si spegne (attivo = outline). A destra una freccia
+   apre un accordion animato con la legenda del layer. */
+.layer-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.layer-list li {
+  padding: 0;
+  border-bottom: none;
+}
+
+.layer-pill {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    background 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+    color 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.layer-pill:hover {
+  /* stesso hover "glass" di .cat-btn:hover */
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(83, 0, 108, 0.22);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(40, 0, 60, 0.10);
+}
+/* PATCH-LUCA "pill-like-cat-active":
+   il pulsante-layer si comporta ESATTAMENTE come il pulsante Transport
+   (.cat-btn): niente pallino, e quando e' acceso si "colora attorno" con lo
+   stesso effetto di .cat-btn.active (bordo viola 2px, sfondo bianco-crema,
+   ombra glass). L'unica differenza rispetto a Transport e' la legenda a
+   comparsa (freccia + accordion). */
+.layer-pill.on {
+  background: rgba(250, 246, 252, 0.98);
+  border: 2px solid rgba(83, 0, 108, 0.65);
+  padding: 9px 11px;  /* compensa i +1px di border per non far saltare il layout */
+  color: var(--text);
+  font-weight: 600;
+  box-shadow:
+    0 1px 3px rgba(40, 0, 60, 0.08),
+    0 3px 8px rgba(83, 0, 108, 0.10),
+    inset 0 1px 0 rgba(255, 255, 255, 0.75);
+}
+
+/* PATCH-LUCA "layer-buttons-like-transport":
+   icona del layer dentro il pill, stessa dimensione/resa delle icone
+   categoria (22x22, stroke = currentColor). Sta tra il pallino di stato e
+   l'etichetta, rendendo il pulsante layer visivamente identico a Transport. */
+.pill-icon {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  color: inherit;
+}
+
+.pill-label {
+  flex: 1;
+}
+
+/* Freccia accordion a destra
+   PATCH-LUCA "caret-direction-inverted": l'SVG base disegna una V (freccia in
+   giu' ⌄). Su richiesta utente: freccia IN GIU' = legenda APERTA, freccia IN
+   SU = legenda CHIUSA. Quindi ruoto di 180deg lo stato di DEFAULT (chiuso ->
+   punta in su ⌃) e riporto a 0deg lo stato .open (aperto -> punta in giu' ⌄). */
+.pill-caret {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  color: inherit;
+  opacity: 0.75;
+  transform: rotate(180deg);   /* chiuso: freccia in su ⌃ */
+  transition:
+    transform 0.32s cubic-bezier(0.4, 0, 0.2, 1),
+    background 0.2s ease,
+    opacity 0.2s ease;
+  cursor: pointer;
+}
+.pill-caret:hover {
+  opacity: 1;
+  background: rgba(83, 0, 108, 0.08);
+}
+.layer-pill:not(.on) .pill-caret:hover {
+  background: rgba(83, 0, 108, 0.08);
+}
+.pill-caret.open {
+  transform: rotate(0deg);     /* aperto: freccia in giu' ⌄ */
+  opacity: 1;
+}
+.pill-caret svg {
+  display: block;
+}
+
+/* Pannello legenda (accordion animato).
+   PATCH-LUCA "legend-accordion-smooth":
+   PRIMA si animava max-height da 0 a 640px: la curva di velocita' veniva
+   calcolata su 640px ma il contenuto reale (~150-250px) finiva molto prima,
+   quindi i bottoni si fermavano di scatto (zoppicamento) e il resto dei
+   640px si "consumava a vuoto". Inoltre max-height non e' accelerato dalla
+   GPU e forza reflow ad ogni frame -> micro-freeze sul primo frame.
+   ORA si usa grid-template-rows 0fr -> 1fr: anima all'ALTEZZA REALE ESATTA
+   del contenuto (niente valore fisso arbitrario), e' fluido da subito e non
+   ha piu' il tratto "a vuoto". will-change prepara il compositor cosi' il
+   primo frame non fa freeze. Il figlio .legend-inner deve avere min-height:0
+   e overflow:hidden perche' la riga di grid possa collassare a 0. */
+.legend-panel {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  margin-top: 0;
+  will-change: grid-template-rows, opacity;
+  transition:
+    grid-template-rows 0.38s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.26s ease,
+    margin-top 0.26s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.legend-panel.open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  margin-top: 6px;
+}
+/* Il wrapper interno della grid: deve poter collassare a 0 altezza. */
+.legend-panel > .legend-inner-wrap {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.legend-inner {
+  padding: 12px 14px;
+  background: linear-gradient(180deg, #faf7fc 0%, #f3ecf6 100%);
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  font-size: 11px;
+  color: var(--text);
+}
+/* PATCH-LUCA "category-legend-naked":
+   Solo per la categoria "Transport stop accessability" (l.id === 'transport')
+   la legenda "Walking time" NON deve avere alcun box attorno (niente sfondo
+   crema, niente bordo, niente riquadro): deve apparire NUDA sotto il pulsante,
+   solo la scritta + barra + etichette. Rimuovo padding/background/border ma
+   lascio un piccolo padding orizzontale per allineare barra/etichette al bordo
+   interno del pulsante. Le altre legende (stops/lines/ecc.) restano nel box. */
+.legend-inner.legend-inner--naked {
+  padding: 2px 2px 0 2px;
+  background: none;
+  border: none;
+  border-radius: 0;
+}
+.legend-hint {
+  font-size: 10.5px;
+  color: var(--muted);
+  line-height: 1.4;
+  margin-bottom: 10px;
+  font-style: italic;
+}
+
+/* Lista tier fermate: pallino di dimensione reale + nome + descrizione */
+.tier-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.tier-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.tier-dot-wrap {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+/* PATCH-LUCA "service-type-dot-only-when-mode" (rev5):
+   Wrapper del pallino accanto a Bus/Metro/Tram nella sezione "Service type".
+   DA SPENTO (default): collassato a 0 -> le scritte stanno il piu' a sinistra
+   possibile (attaccate al checkbox, niente spazio riservato).
+   DA ACCESO (.on, stopThemeMode === 'mode'): 16px -> le scritte traslano a
+   destra e compare il pallino (12px) colorato per modo. La transizione width
+   rende morbida la traslazione. overflow:hidden evita che il pallino "sbordi"
+   mentre il wrapper e' collassato. */
+.tier-dot-wrap.mode-dot-wrap {
+  width: 0;
+  height: 16px;
+  overflow: hidden;
+  /* .theme-check ha gap:8px: col wrapper a width:0 resterebbe comunque un gap
+     di 8px tra checkbox e testo. margin-left:-8px lo annulla da spento cosi' le
+     scritte sono davvero attaccate al checkbox; da acceso (.on) torna a 0 e il
+     gap ricompare naturale accanto al pallino. */
+  margin-left: -8px;
+  transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+              margin-left 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.tier-dot-wrap.mode-dot-wrap.on {
+  width: 16px;
+  margin-left: 0;
+}
+.tier-dot {
+  border-radius: 50%;
+  border: 1.2px solid #ffffff;
+  box-shadow: 0 1px 2px rgba(83, 0, 108, 0.20);
+  display: block;
+}
+.tier-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+.tier-name {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+.tier-desc {
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+}
+
+/* Lista colori linee
+   PATCH-LUCA "line-legend-nowrap":
+   La legenda in modalita' Livery elenca linee reali con etichette lunghe
+   ("Lines 5a, 5b, R80", "Night lines (400s, 500s, 597, 609, ...)"), quindi
+   passo a 1 colonna e forzo nowrap su nome + range: niente piu' rientri
+   spezzati come "Very High" a capo "(81-150)". */
+.line-legend {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.line-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10.5px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+}
+.line-swatch {
+  width: 18px;
+  height: 4px;
+  border-radius: 2px;
+  flex-shrink: 0;
+  /* PATCH-LUCA "night-white": bordo rinforzato per rendere visibile il
+     campione bianco delle Night lines su sfondo chiaro della legenda. */
+  box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.35);
+}
+.line-name {
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex: 1;
+}
+
+/* =========================================================================
+   PATCH-LUCA "livery-legend-select":
+   Selezione interattiva delle linee dalla legenda "Transport lines" (livery).
+   - .line-legend--selectable: la lista intera è cliccabile (click sul vuoto =
+     reset del filtro); default cursor per suggerire che si può cliccare.
+   - .line-row--clickable: ogni riga è un target di click; hover con leggero
+     sfondo viola tenue e lift.
+   - .line-row.dimmed: riga NON selezionata quando un filtro è attivo -> resa
+     semi-trasparente (0.28) così spicca solo quella accesa. La transizione
+     rende morbido il cambio di stato.
+   ========================================================================= */
+.line-legend--selectable {
+  cursor: default;
+}
+.line-row--clickable {
+  cursor: pointer;
+  padding: 3px 6px;
+  margin: 0 -6px;              /* estende l'area cliccabile senza spostare il testo */
+  border-radius: 6px;
+  transition: opacity 0.22s ease, background 0.15s ease;
+}
+.line-row--clickable:hover {
+  background: rgba(83, 0, 108, 0.08);
+}
+.line-row.dimmed {
+  opacity: 0.28;
+}
+.line-row.dimmed:hover {
+  /* anche se dimmed, all'hover riporto un po' di visibilità per capire su cosa
+     sto per cliccare */
+  opacity: 0.55;
+}
+
+/* =========================================================================
+   PATCH-LUCA "livery-legend-expand-sublines" (2026-07-29):
+   Freccetta di espansione delle righe multi-linea + sotto-voci (singole linee).
+   - .line-caret: freccetta a destra della riga; ruota di 180deg quando aperta
+     (stessa logica della .pill-caret ma piu' piccola).
+   - .line-subrow: riga di una singola linea (Line 20/79/R92), leggermente
+     rientrata a destra con un trattino verticale, campione piu' piccolo.
+   ========================================================================= */
+.line-caret {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  color: inherit;
+  opacity: 0.7;
+  transform: rotate(180deg);   /* chiuso: freccia in su */
+  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1), background 0.15s ease, opacity 0.15s ease;
+  cursor: pointer;
+}
+.line-caret:hover {
+  opacity: 1;
+  background: rgba(83, 0, 108, 0.10);
+}
+.line-caret.open {
+  transform: rotate(0deg);     /* aperto: freccia in giu' */
+  opacity: 1;
+}
+.line-caret svg { display: block; }
+
+/* Sotto-riga: singola linea di un gruppo espanso.
+   PATCH-LUCA "livery-legend-sublines-dim+indent" FIX specificita':
+   .line-row--clickable ha `padding: 3px 6px` (shorthand) che azzera il
+   padding-left. Alzo la specificita' con .line-row--clickable.line-subrow e
+   uso !important sul padding-left per garantire il rientro (tabulazione). */
+.line-row--clickable.line-subrow {
+  padding-left: 40px !important;   /* rientro marcato (tabulazione) */
+  position: relative;
+}
+.line-subrow::before {
+  /* trattino guida verticale a sinistra della sotto-voce */
+  content: '';
+  position: absolute;
+  left: 24px;
+  top: 50%;
+  width: 8px;
+  height: 1px;
+  background: rgba(83, 0, 108, 0.35);
+}
+.line-swatch--sub {
+  width: 12px;                 /* campione piu' piccolo per le sotto-linee */
+}
+
+
+/* =========================================================================
+   PATCH-LUCA "lines-legend-by-mode-2026-09-01":
+   Intestazioni di MODO (Bus / Metro / Tram) che raggruppano le righe-colore
+   nella legenda "Transport lines". Sono cliccabili: accendono tutte le linee
+   di quel modo (combinabile). Stile: etichetta in maiuscoletto viola, con
+   trattino sotto; quando SELEZIONATA (.on) si evidenzia con sfondo/bordo viola.
+   ========================================================================= */
+.line-mode-header {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px 6px;
+  margin: 8px -6px 2px -6px;   /* piccolo stacco dal gruppo precedente */
+  border-radius: 6px;
+  border: 1px solid transparent;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.line-mode-header:first-child {
+  margin-top: 0;
+}
+.line-mode-header:hover {
+  background: rgba(83, 0, 108, 0.08);
+  color: var(--text);
+}
+/* Modo SELEZIONATO: evidenziato come un chip attivo. */
+.line-mode-header.on {
+  background: rgba(83, 0, 108, 0.12);
+  border-color: rgba(83, 0, 108, 0.55);
+  color: var(--text);
+}
+/* Righe-colore dentro un gruppo: leggero rientro per distinguerle dal titolo. */
+.line-row--clickable.line-row--in-mode {
+  padding-left: 14px;
+}
+
+
+/* =========================================================================
+   PATCH-LUCA "line-style-toggle"
+   Toggle switch nella legenda "Transit lines" per alternare:
+     - Frequency (QML heatmap YlOrRd, DEFAULT)
+     - Livery    (livrea ufficiale De Lijn)
+   ========================================================================= */
+
+.style-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 2px 10px 2px;
+  border-bottom: 1px dashed #e5e7eb;
+  margin-bottom: 8px;
+}
+
+.style-toggle-label {
+  font-size: 11px;
+  color: #9ca3af;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  user-select: none;
+  transition: color 160ms ease;
+}
+.style-toggle-label.active {
+  color: #1f2937;
+  font-weight: 600;
+}
+
+.style-toggle {
+  position: relative;
+  width: 34px;
+  height: 18px;
+  border-radius: 999px;
+  border: 1px solid #cbd5e1;
+  background: #f1f5f9;
+  cursor: pointer;
+  padding: 0;
+  flex: 0 0 auto;
+  transition: background 180ms ease, border-color 180ms ease;
+}
+.style-toggle:hover { border-color: #94a3b8; }
+.style-toggle.livery {
+  background: #6b2a85;
+  border-color: #6b2a85;
+}
+
+.style-toggle-knob {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.25);
+  transition: transform 200ms cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+.style-toggle.livery .style-toggle-knob {
+  transform: translateX(16px);
+}
+
+/* Piccolo hint sul range di frequenza accanto al nome */
+.line-range {
+  color: #94a3b8;
+  font-weight: 400;
+  font-size: 11px;
+  margin-left: 4px;
+  white-space: nowrap;
+}
+
+
+/* ==========================================================================
+   PATCH-LUCA "category-color-transition" (v2 - via JS):
+   La versione CSS-only (transition su fill/stroke SVG) NON funziona in modo
+   affidabile: molti browser (Chrome/Edge in particolare) NON animano le
+   proprieta' fill/stroke quando cambiano via attributi SVG. Per questo
+   l'animazione era invisibile.
+
+   Ora la transizione e' implementata in TypeScript con requestAnimationFrame
+   (metodo animateCategoryChange in app.component.ts): interpola i colori
+   frame per frame chiamando ripetutamente setStyle sul layer degli esagoni.
+   Funziona su tutti i browser.
+
+   Lasciamo qui SOLO la disabilitazione durante zoom, giusto per completezza:
+   Leaflet aggiunge .leaflet-zoom-anim durante il pan/zoom e non vogliamo
+   effetti visivi indesiderati sui poligoni in quella fase.
+   ========================================================================== */
+.leaflet-zoom-anim .leaflet-polygonsPane-pane path {
+  /* durante zoom, no filtri/animazioni CSS aggiuntive */
+}
+
+
+/* PATCH-LUCA "unified-4-buttons":
+   Rimosse le intestazioni <h2> "Categoria"/"Layers": ora Transport (.cat-grid)
+   e i 3 layer (.layer-list) formano un'unica colonna di 4 pulsanti equidistanti.
+   Aggiungo 8px di stacco sopra la lista layer per mantenere lo stesso gap
+   verticale (8px) che c'e' tra i pulsanti, anche quando la legenda di
+   Transport non e' visibile. */
+.layer-list {
+  margin-top: 8px;
+}
+
+/* Titolino "Walking time (min)" sopra la barra della legenda di Transport:
+   reso come hint discreto (non come intestazione di sezione), coerente con
+   gli hint delle legende dei layer. */
+.walking-hint {
+  margin-top: 8px;
+}
+
+
+/* ===== PATCH-LUCA "stops-thematize": toggle Thematize + lista modalita' ===== */
+.thematize-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 4px 2px 8px;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+.thematize-switch {
+  position: relative;
+  width: 34px;
+  height: 18px;
+  border-radius: 9px;
+  background: #cbb8d6;
+  transition: background 0.2s ease;
+  flex: 0 0 auto;
+}
+.thematize-toggle.on .thematize-switch {
+  background: #7a1fa2;
+}
+.thematize-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+.thematize-toggle.on .thematize-knob {
+  transform: translateX(16px);
+}
+.thematize-label {
+  font-weight: 600;
+  font-size: 0.86rem;
+}
+
+.thematize-panel {
+  padding-top: 2px;
+}
+.theme-list {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+}
+.theme-row {
+  margin: 2px 0;
+}
+.theme-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 0.84rem;
+  padding: 3px 2px;
+  border-radius: 6px;
+}
+.theme-check:hover {
+  background: rgba(122, 31, 162, 0.06);
+}
+.theme-check input {
+  accent-color: #7a1fa2;
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+}
+.theme-name {
+  font-weight: 500;
+}
+
+
+/* ===== PATCH-LUCA "walking-legend-swipe": animazione legenda Walking time ===== */
+/*
+ * Effetto richiesto:
+ *  - Al click su Transport: i pulsanti-layer vengono "spinti giu'" e la
+ *    legenda appare scorrendo da SINISTRA -> DESTRA.
+ *  - Alla chiusura: la legenda sparisce da DESTRA -> SINISTRA e i pulsanti
+ *    risalgono.
+ *
+ * Tecnica:
+ *  - .walking-legend anima max-height (0 -> auto-ish) + margini: e' questo
+ *    collasso verticale che spinge giu'/su la .layer-list sottostante.
+ *  - .walking-legend-inner anima clip-path inset() sull'asse X per lo swipe
+ *    orizzontale, piu' un piccolo translateX + opacity per rifinire.
+ */
+.walking-legend {
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  margin-top: 0;
+  margin-bottom: 0;
+  /* La transizione su max-height governa lo "spingi giu' / risali" dei pulsanti.
+     easing morbido, durata coerente con lo swipe orizzontale interno. */
+  transition:
+    max-height 0.42s cubic-bezier(0.22, 1, 0.36, 1),
+    margin-top 0.42s cubic-bezier(0.22, 1, 0.36, 1),
+    margin-bottom 0.42s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.28s ease;
+}
+.walking-legend.open {
+  max-height: 120px;   /* abbastanza per hint + barra + labels */
+  opacity: 1;
+  margin-top: 10px;
+  margin-bottom: 6px;
+}
+
+.walking-legend-inner {
+  /* Stato CHIUSO: tutto tagliato da destra (inset destro = 100%) ->
+     l'elemento e' invisibile, "arrotolato" a sinistra. */
+  clip-path: inset(0 100% 0 0);
+  transform: translateX(-6px);
+  transition:
+    clip-path 0.42s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.walking-legend.open .walking-legend-inner {
+  /* Stato APERTO: nessun taglio -> rivelato interamente.
+     Il passaggio 100% -> 0% sul lato DESTRO dell'inset fa "srotolare" il
+     contenuto da SINISTRA verso DESTRA. In chiusura avviene l'inverso:
+     0% -> 100% = il contenuto si "riavvolge" da DESTRA verso SINISTRA. */
+  clip-path: inset(0 0 0 0);
+  transform: translateX(0);
+}
+
+
+/* ============================================================
+   PATCH-LUCA "focus-line-on-map":
+   Bottone tondo in basso a destra della mappa, visibile solo in focus mode.
+   Freccia verso il basso: torna al grafico "Top 10 busiest lines" e ripristina
+   i layer precedenti. Stile coerente con la palette viola Deda e con il
+   pulsante basemap (tondo, ombra morbida, hover leggero).
+   ============================================================ */
+.focus-back-btn {
+  position: absolute;
+  right: 12px;
+  bottom: 16px;
+  z-index: 1001;              /* sopra la mappa e i controlli Leaflet */
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  background: var(--accent);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 3px 10px rgba(83, 0, 108, 0.35);
+  transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+  /* animazione di comparsa: sale dal basso + fade-in */
+  animation: focusBtnIn 0.28s ease both;
+}
+.focus-back-btn:hover {
+  background: var(--active-bg);
+  transform: translateY(-2px);
+  box-shadow: 0 5px 14px rgba(83, 0, 108, 0.45);
+}
+.focus-back-btn:active {
+  transform: translateY(0);
+}
+.focus-back-btn svg {
+  display: block;
+  /* piccolo "rimbalzo" continuo della freccia per invitare a scrollare giu' */
+  animation: focusArrowBounce 1.6s ease-in-out infinite;
+}
+
+@keyframes focusBtnIn {
+  from { opacity: 0; transform: translateY(10px) scale(0.85); }
+  to   { opacity: 1; transform: translateY(0)    scale(1); }
+}
+@keyframes focusArrowBounce {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(3px); }
+}
+
+
+/* ============================================================
+   PATCH-LUCA "analytics-kpi-metrics" (v3 minimal, stacked):
+   Riga di metriche in cima al pannello "Leuven Transit — Analytics".
+   TUTTE su una sola riga, SENZA box individuali: look pulito e minimal.
+   Ogni metrica ha il NOME sopra e il RISULTATO sotto (impilati). Le metriche
+   sono separate solo da un sottile divisore verticale "|" (.kpi-sep).
+   Palette viola Deda.
+   ============================================================ */
+.kpi-metrics {
+  /* PATCH-LUCA "kpi-one-line-full-width" (2026-09-03): tutti i KPI su UNA SOLA
+     RIGA (mai a capo) e distribuiti su TUTTA la larghezza della sezione
+     (space-between): usano sempre al massimo l'extent disponibile invece di
+     restare schiacciati a sinistra. width:100% + justify-content:space-between
+     spingono le voci ad occupare l'intera riga; i separatori "|" restano
+     equidistanti tra una voce e l'altra. */
+  display: flex;
+  align-items: stretch;
+  flex-wrap: nowrap;            /* mai a capo */
+  justify-content: space-between;
+  width: 100%;
+  gap: 0 6px;
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px dashed var(--border-light);
+}
+.kpi-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  white-space: nowrap;
+  flex: 0 1 auto;              /* possono restringersi se serve, ma stanno su 1 riga */
+}
+.kpi-label {
+  font-size: 9px;             /* leggibile: la larghezza ora e' tutta sfruttata */
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  line-height: 1.15;
+}
+.kpi-value {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text);
+  line-height: 1.1;
+}
+.kpi-unit {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-left: 1px;
+}
+.kpi-sep {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  color: var(--border-light);
+  font-weight: 400;
+  font-size: 20px;
+  user-select: none;
+}
+
+/* ============================================================
+   PATCH-LUCA "kpi-by-mode-2026-09-04" (richiesta Luca):
+   La riga KPI diventa CLICCABILE (quando c'e' il breakdown per service type)
+   e apre/chiude sotto un MENU A TENDINA con la tabella delle metriche di
+   trasporto/rete separate per bus/metro/tram.
+   - .kpi-metrics--clickable: cursore pointer + hover con evidenziazione LEGGERA
+     (sfondo viola tenue, angoli arrotondati). Non altera il layout (padding
+     compensato con box-shadow, niente border-box shift).
+   - .kpi-caret: freccetta a destra della riga; ruota quando aperto.
+   - .kpi-bymode-panel: accordion animato (grid-template-rows 0fr->1fr) come le
+     legende della sidebar.
+   - .kpi-bymode-table: tabella righe=modo x colonne=metrica, palette viola Deda.
+   ============================================================ */
+/* ============================================================
+   PATCH-LUCA "mode-agencies-collapsed-2026-11-09" (richiesta Luca):
+   Blocco compatto mostrato SOTTO la riga dei KPI (e SOLO quando la tabella per
+   SERVICE TYPE e' CHIUSA, cioe' !kpiExpanded). Una riga per modo:
+       bus:  <agenzia cliccabile>   <date range>
+       metro: ...
+       tram:  ...
+   Il nome dell'agenzia usa la classe globale .lz-line-link (hover viola +
+   sottolineatura) gia' usata per fermate/linee. Il date range e' in grigio a
+   destra. Quando l'utente espande i KPI, il blocco si nasconde (ngIf) e resta
+   la tabella; richiudendo, riappare. Palette viola Deda.
+   ============================================================ */
+.kpi-mode-agencies {
+  /* PATCH-LUCA "mode-agencies-left-stack-2026-09-11" (richiesta Luca):
+     le voci-modo NON sono piu' in fila e centrate, ma IMPILATE (una per riga,
+     una sopra l'altra) e ALLINEATE A SINISTRA, per qualsiasi numero di modi
+     (1 -> una sola riga a sinistra; 2 -> due righe a sinistra; 3 -> tre righe
+     a sinistra; e cosi' via). Quindi flex-direction:column + align-items:
+     flex-start + text-align:left. */
+  display: flex;
+  flex-direction: column;   /* PATCH-LUCA: voci-modo IMPILATE (una per riga) */
+  align-items: flex-start;  /* PATCH-LUCA: allineate a SINISTRA */
+  justify-content: flex-start;
+  gap: 5px;                 /* spazio verticale tra una voce-modo e l'altra */
+  margin-top: -6px;   /* recupera lo spazio del padding-bottom della riga KPI */
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px dashed var(--border-light);
+  text-align: left;        /* PATCH-LUCA: testo allineato a sinistra */
+}
+.kpi-mode-agency-row {
+  display: inline-flex;     /* ogni voce e' compatta, contenuto affiancato */
+  align-items: baseline;
+  gap: 5px;
+  font-size: 10.5px;         /* leggermente piu' grande (era 9.5px) */
+  line-height: 1.3;
+  color: var(--text);
+  flex: 0 0 auto;          /* NON si allargano: restano compatte e centrate */
+  white-space: nowrap;
+}
+.kpi-mode-agency-mode {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  flex: 0 0 auto;
+}
+.kpi-mode-agency-name {
+  font-weight: 600;
+  color: var(--text);
+}
+.kpi-mode-agency-range {
+  color: var(--muted);
+  font-size: 10px;
+  white-space: nowrap;
+}
+/* Link dell'agenzia nel blocco agenzie-per-modo: stesso stile degli altri link
+   della dashboard (.si-line-link / .lz-line-link): viola #4a1d63 grassetto NON
+   sottolineato di default, all'HOVER vira al viola #7a1fa2 e si sottolinea.
+   La cella e' DENTRO il componente Angular, quindi la regola scoped colpisce
+   direttamente il link (niente ::ng-deep). */
+a.kpi-mode-agency-name.lz-line-link {
+  color: #4a1d63;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 0.15s ease, text-decoration-color 0.15s ease;
+}
+a.kpi-mode-agency-name.lz-line-link:hover {
+  color: #7a1fa2;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.kpi-metrics--clickable {
+  cursor: pointer;
+  /* estende leggermente l'area cliccabile senza spostare i contenuti.
+     PATCH-LUCA "kpi-hover-taller-no-persist": il riquadro di hover e' un po'
+     PIU' ALTO (padding verticale) e NON deve restare evidenziato dopo il
+     click: l'illuminazione avviene SOLO in :hover. */
+  padding: 6px 6px;
+  margin-left: -6px;
+  margin-right: -6px;
+  margin-top: -6px;
+  border-radius: 8px;
+  transition: background 0.16s ease, box-shadow 0.16s ease;
+}
+.kpi-metrics--clickable:hover {
+  /* hover leggero: sfondo viola tenue */
+  background: rgba(83, 0, 108, 0.05);
+  box-shadow: inset 0 0 0 1px rgba(83, 0, 108, 0.10);
+}
+
+/* Freccetta a destra della riga KPI: chiusa punta in giu' (invita ad aprire),
+   ruota di 180deg quando il menu e' aperto. */
+/* Freccetta a destra della riga KPI.
+   PATCH-LUCA "kpi-caret-direction" (richiesta Luca): l'SVG disegna una V verso
+   il BASSO (⌄). Vogliamo: CHIUSA -> freccia verso l'ALTO (⌃), APERTA -> freccia
+   verso il BASSO (⌄). Quindi ruoto di 180deg lo stato di DEFAULT (chiuso) e
+   riporto a 0deg lo stato .open (aperto). */
+.kpi-caret {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  align-self: center;
+  margin-left: 2px;
+  border-radius: 50%;
+  color: var(--muted);
+  opacity: 0.8;
+  transform: rotate(180deg);   /* chiuso: freccia in su ⌃ */
+  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.16s ease, background 0.16s ease;
+}
+.kpi-metrics--clickable:hover .kpi-caret {
+  opacity: 1;
+  background: rgba(83, 0, 108, 0.10);
+}
+.kpi-caret.open {
+  transform: rotate(0deg);     /* aperto: freccia in giu' ⌄ */
+  color: var(--text);
+  opacity: 1;
+}
+.kpi-caret svg { display: block; }
+
+/* Pannello a tendina con la tabella per service type (accordion animato). */
+.kpi-bymode-panel {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  margin-top: 0;
+  will-change: grid-template-rows, opacity;
+  transition:
+    grid-template-rows 0.34s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.24s ease,
+    margin-top 0.24s cubic-bezier(0.4, 0, 0.2, 1),
+    margin-bottom 0.24s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.kpi-bymode-panel.open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  margin-top: -8px;    /* recupera parte del margin-bottom della riga KPI */
+  margin-bottom: 18px;
+}
+/* Wrapper interno: puo' collassare a 0 (min-height:0 + overflow:hidden). */
+.kpi-bymode-wrap {
+  min-height: 0;
+  overflow: hidden;    /* verticale per l'accordion */
+  overflow-x: auto;    /* orizzontale se la tabella e' piu' larga del pannello */
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  background: #ffffff;  /* PATCH-LUCA: sfondo tabella BIANCO (richiesta Luca) */
+}
+.kpi-bymode-panel.open .kpi-bymode-wrap {
+  overflow-y: hidden;
+  overflow-x: auto;
+}
+
+.kpi-bymode-table {
+  width: 100%;
+  border-collapse: collapse;
+  /* PATCH-LUCA "kpi-bymode-cols-equal" (richiesta Luca): tutte le colonne
+     occupano lo STESSO spazio e sono distanziate allo stesso modo.
+     table-layout:fixed distribuisce la larghezza equamente tra le colonne. */
+  table-layout: fixed;
+  font-size: 11px;
+  color: var(--text);
+}
+/* Con table-layout:fixed + width:100% sulla tabella, le colonne SENZA width
+   esplicita vengono automaticamente distribuite in parti UGUALI, qualunque sia
+   il loro numero. Cosi' occupano tutte lo stesso spazio e restano equidistanti,
+   senza dover fissare una percentuale (che dipenderebbe dal n. di metriche).
+   La prima colonna (Bus/Metro/Tram) e' un filo piu' larga per contenere le
+   etichette; i valori delle altre colonne sono allineati a DESTRA (vedi sotto)
+   cosi' le cifre si incolonnano correttamente. */
+.kpi-bymode-table col.kpi-bymode-col-mode,
+.kpi-bymode-modehead,
+.kpi-bymode-mode {
+  width: 92px;
+}
+.kpi-bymode-table th,
+.kpi-bymode-table td {
+  padding: 7px 10px;
+  /* PATCH-LUCA "kpi-bymode-right-align" (richiesta Luca): i VALORI numerici
+     sono allineati a DESTRA cosi' le cifre si incolonnano (unita'/decine/
+     centinaia allineate). La prima colonna (modo) resta a sinistra grazie
+     alle regole .kpi-bymode-mode/.kpi-bymode-modehead con !important. */
+  text-align: right;
+  /* PATCH-LUCA "kpi-bymode-cols-equal": niente nowrap, cosi' i valori si
+     adattano alla larghezza uguale delle colonne senza essere tagliati. */
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* PATCH-LUCA "date-range-nowrap-single-line-2026-10-09" (richiesta Luca):
+   Il valore "Date range" (formato "dd/mm/aaaa - dd/mm/aaaa") NON deve andare
+   a capo sul trattino: le due date restano AFFIANCATE sulla stessa riga (una
+   di fianco all'altra, non una sopra l'altra). Il <td> conserva
+   overflow-wrap:anywhere come contenitore, ma la SPAN del valore
+   (.kpi-bymode-val) forza white-space:nowrap: cosi' l'intervallo resta su una
+   sola riga. La tabella e' gia' in un wrapper con overflow-x:auto
+   (.kpi-bymode-wrap), quindi se lo spazio non basta compare lo scroll
+   orizzontale invece del ritorno a capo. */
+.kpi-bymode-table td .kpi-bymode-val {
+  white-space: nowrap;
+}
+
+/* PATCH-LUCA "date-range-two-col-width-2026-10-09" (richiesta Luca):
+   La colonna "Date range" contiene un intervallo lungo ("dd/mm/aaaa -
+   dd/mm/aaaa"): renderla larga QUANTO le altre la fa sembrare sproporzionata.
+   Per "ingannare" la tabella e farla sembrare larga come DUE colonne (col
+   titolo centrato sopra le due date), le assegno una larghezza DOPPIA rispetto
+   alle altre. Con table-layout:fixed, il browser distribuisce lo spazio in
+   base alle width dichiarate: dando alla colonna Date range il DOPPIO (2 * la
+   larghezza-base) e alle altre la base, la Date range occupa lo spazio di 2
+   colonne mentre le restanti restano proporzionate tra loro.
+
+   Ordine colonne per-modo (data-driven da analytics.json):
+     1) Service type (prima colonna, gia' larga 92px -> :nth-child(1))
+     2) Total stops   -> nth-child(2)
+     3) Stop density  -> nth-child(3)
+     4) Avg km/day    -> nth-child(4)
+     5) Avg trip/day  -> nth-child(5)
+     6) Total lines   -> nth-child(6)
+     7) DATE RANGE    -> nth-child(7)   <-- questa, doppia larghezza
+     8) Agencies      -> nth-child(8)
+   Il titolo "Date range" (thead th) resta CENTRATO sopra la colonna larga
+   (text-align:center) cosi' sembra il titolo di un blocco a 2 colonne. Il
+   valore (nowrap, gia' impostato sopra) resta su una riga e ora ha spazio
+   sufficiente per stare tutto affiancato senza tagli. */
+.kpi-bymode-table th:nth-child(7),
+.kpi-bymode-table td:nth-child(7) {
+  /* PATCH-LUCA "date-range-1-and-half-col-2026-10-09" (richiesta Luca): la
+     colonna Date range occupa ~1 COLONNA E MEZZA (via di mezzo tra 1 e 2),
+     non piu' 2 piene. Con table-layout:fixed conta il RAPPORTO tra le width:
+     ~17% = circa 1.5x la larghezza-base delle altre colonne dati (~11%). */
+  width: 17%;
+}
+/* PATCH-LUCA "kpi-bymode-explicit-col-widths-2026-10-09" (richiesta Luca):
+   PROBLEMA: con table-layout:fixed avevo dato width ESPLICITA solo a Service
+   type (col1, 92px) e a Date range (col7, 17%). Le altre colonne (2-6, 8) NON
+   avevano width -> il browser si divideva lo spazio residuo in modo NON
+   controllato, e siccome "Agencies" (col8) e' larga (liste di sigle), la
+   colonna Date range risultava OTTICAMENTE spinta a sinistra (vicina a Total
+   lines) e lontana da Agencies.
+   FIX: assegno una width ESPLICITA a TUTTE le colonne dati cosi\u0027 sono davvero
+   uguali tra loro (~13% ciascuna) e Date range e' ~19% (1.5x) centrata: le sue
+   distanze da Total lines (col6) e Agencies (col8) diventano identiche. */
+.kpi-bymode-table th:nth-child(2), .kpi-bymode-table td:nth-child(2),
+.kpi-bymode-table th:nth-child(3), .kpi-bymode-table td:nth-child(3),
+.kpi-bymode-table th:nth-child(4), .kpi-bymode-table td:nth-child(4),
+.kpi-bymode-table th:nth-child(5), .kpi-bymode-table td:nth-child(5),
+.kpi-bymode-table th:nth-child(6), .kpi-bymode-table td:nth-child(6),
+.kpi-bymode-table th:nth-child(8), .kpi-bymode-table td:nth-child(8) {
+  width: 13%;
+}
+.kpi-bymode-table th:nth-child(7),
+.kpi-bymode-table td:nth-child(7) {
+  width: 19%;   /* ~1.5x le altre (13%), centrata tra col6 e col8 */
+}
+.kpi-bymode-table thead th:nth-child(7) {
+  /* titolo "Date range" allineato a destra come le altre intestazioni numeriche
+     e come il valore sottostante (coerenza colonna). */
+  text-align: right;
+  padding-right: 24px;
+}
+/* PATCH-LUCA "date-range-center-in-cell-2026-10-09" (richiesta Luca): il valore
+   "dd/mm/aaaa - dd/mm/aaaa" sembrava spinto a SINISTRA (troppo vicino a Total
+   lines) e lontano da Agencies. Cause: (1) il padding laterale 10px \u002B nowrap su
+   una cella stretta faceva "toccare" il testo al bordo sinistro; (2) la .span
+   del valore ereditava un allineamento non centrato. FIX: padding orizzontale
+   RIDOTTO e SIMMETRICO (4px per lato) sulla sola colonna 7, e la .kpi-bymode-val
+   resa display:inline-block \u002B text-align:center cosi\u0027 l\u0027intervallo e\u0027 davvero
+   CENTRATO in mezzo al suo spazio (equidistante da Total lines e Agencies).
+
+   PATCH-LUCA "date-range-center-force-2026-10-09" (richiesta Luca, rev): la
+   colonna Date range ha spazio (19%) MA il valore stava tutto a SINISTRA
+   lasciando vuoto a destra. Causa: la regola generale '.kpi-bymode-table td
+   { text-align: right }' vinceva e il inline-block veniva spinto a destra/
+   sinistra in modo incoerente. FIX DEFINITIVO: forzo text-align:center con
+   !important sul td:nth-child(7) (batte il right generale) e tolgo l\u0027inline-
+   block dalla span (torna testo normale, centrato dal td). Cosi\u0027 le due date
+   stanno ESATTAMENTE A META\u0027 della colonna, con spazio uguale a sinistra e a
+   destra. */
+.kpi-bymode-table th:nth-child(7),
+.kpi-bymode-table td:nth-child(7) {
+  padding-left: 4px;
+  padding-right: 4px;
+}
+.kpi-bymode-table td:nth-child(7) .kpi-bymode-val {
+  display: inline;
+}
+
+/* PATCH-LUCA "date-range-value-centered-under-title-2026-10-09" (richiesta Luca):
+   Il TITOLO "Date range" e' perfetto dov'e' (text-align:right + padding-right:24px,
+   quindi vicino al lato destro della sua colonna). Le DATE sotto devono stare
+   CENTRATE RISPETTO al titolo "Date range" (il centro dell'intervallo di date
+   allineato col centro della parola "Date range"), non incolonnate a destra.
+   Siccome l'intervallo "dd/mm/aaaa - dd/mm/aaaa" (~90px) e' piu' LARGO della
+   scritta "Date range" (~55px), per centrarlo sotto il titolo devo spostarlo un
+   po' piu' a sinistra rispetto al titolo: uso text-align:right ma con un
+   padding-right RIDOTTO (~7px invece di 24px). Cosi' meta' della differenza di
+   larghezza (~17px) sporge a sinistra e il centro delle date cade sotto il
+   centro di "Date range". */
+.kpi-bymode-table td:nth-child(7) {
+  text-align: right !important;
+  padding-right: 1px !important;
+}
+/* PATCH-LUCA "date-range-shift-right-2026-11-09" (richiesta Luca): i 3 valori
+   "dd/mm/aaaa - dd/mm/aaaa" (Bus/Metro/Tram) vanno spostati LEGGERMENTE piu' a
+   DESTRA rispetto alla posizione attuale. Uso una piccola traslazione orizzontale
+   (translateX) sulla span del valore, cosi' l'intervallo di date scorre a destra
+   senza toccare il titolo "Date range" ne' l'allineamento delle altre colonne. */
+.kpi-bymode-table td:nth-child(7) .kpi-bymode-val {
+  display: inline-block;
+  transform: translateX(17px);
+}
+/* Intestazione colonne */
+.kpi-bymode-table thead th {
+  font-size: 8.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border-light);
+}
+/* Prima colonna (modo) allineata a sinistra */
+.kpi-bymode-modehead,
+.kpi-bymode-mode {
+  text-align: left !important;
+  /* PATCH-LUCA "kpi-bymode-mode-nowrap" (richiesta Luca): l'intestazione
+     "Service type" e le etichette Bus/Metro/Tram NON devono andare a capo. */
+  white-space: nowrap !important;
+  overflow-wrap: normal !important;
+}
+.kpi-bymode-table tbody tr + tr td {
+  border-top: 1px dashed var(--border-light);
+}
+.kpi-bymode-mode {
+  font-weight: 700;
+  color: var(--text);
+}
+.kpi-bymode-val {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.kpi-bymode-unit {
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--muted);
+}
+/* Pallino colore del modo, coerente con STOP_MODE_TIERS del TS:
+   bus #7a1fa2, metro #2e86de, tram #e91e8c. */
+.kpi-bymode-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: baseline;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.6);
+}
+.kpi-bymode-dot--bus   { background: #7a1fa2; }
+.kpi-bymode-dot--metro { background: #2e86de; }
+.kpi-bymode-dot--tram  { background: #e91e8c; }
+
+/* ============================================================
+   PATCH-LUCA "schedule-board-overlay" (2026-07-24, sostituisce
+   "stop-schedule-panel"): OVERLAY GRANDE CENTRATO SOPRA LA MAPPA (info-box
+   stile tabellone di stazione), con selettore settimana a frecce e, per ogni
+   linea, un vero tabellone RIGHE=fermate x COLONNE=corse.
+   ============================================================ */
+
+/* Sfondo scuro dietro il modale (click = chiudi) */
+.sched-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 10, 30, 0.45);
+  z-index: 1200;
+  animation: schedFade 0.18s ease;
+}
+@keyframes schedFade { from { opacity: 0; } to { opacity: 1; } }
+
+/* Box modale centrato, grande */
+.sched-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.96);
+  width: 860px;
+  max-width: 94vw;
+  height: 82vh;
+  max-height: 900px;
+  background: #ffffff;
+  border-radius: 14px;
+  box-shadow: 0 18px 60px rgba(30, 10, 50, 0.42);
+  z-index: 1201;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  opacity: 0;
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.22s ease;
+  font: 13px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: #2b2340;
+}
+.sched-modal.open {
+  transform: translate(-50%, -50%) scale(1);
+  opacity: 1;
+}
+
+/* Header: nome fermata a sinistra, selettore settimana al centro, chiudi a destra */
+.sched-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  background: linear-gradient(135deg, #7a1fa2, #5b1179);
+  color: #fff;
+  flex: 0 0 auto;
+}
+.sched-head-text { flex: 1 1 auto; min-width: 0; }
+.sched-stop-name {
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.2;
+  word-break: break-word;
+}
+.sched-stop-id {
+  margin-top: 2px;
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+/* Selettore settimana con frecce < > */
+.sched-weeknav {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  padding: 4px 6px;
+}
+
+/* PATCH-LUCA "stop-board-per-real-day": selettore GIORNO (7 giorni) accanto al
+   selettore settimana. Dropdown nativo <select> stilizzato coerente con
+   l'header viola. I giorni senza servizio sono option [disabled] (grigi). */
+.sched-daynav {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+}
+.sched-dayselect {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.30);
+  border-radius: 999px;
+  padding: 7px 30px 7px 14px;
+  cursor: pointer;
+  outline: none;
+  /* freccetta bianca a destra */
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M2 4 L6 8 L10 4' fill='none' stroke='white' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.sched-dayselect:hover {
+  background-color: rgba(255, 255, 255, 0.26);
+  border-color: rgba(255, 255, 255, 0.45);
+}
+/* Le option ereditano lo sfondo del sistema: forzo testo scuro leggibile */
+.sched-dayselect option {
+  color: #2b2340;
+  background: #fff;
+}
+.sched-dayselect option:disabled {
+  color: #b3a9c2;
+}
+
+.sched-arrow {
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, transform 0.1s;
+}
+.sched-arrow:hover:not(:disabled) { background: rgba(255, 255, 255, 0.34); }
+.sched-arrow:active:not(:disabled) { transform: scale(0.92); }
+.sched-arrow:disabled { opacity: 0.3; cursor: not-allowed; }
+.sched-weeklabel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 150px;
+  line-height: 1.15;
+}
+.sched-weeklabel-top {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.75;
+}
+.sched-weeklabel-main {
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.sched-close {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+.sched-close:hover { background: rgba(255, 255, 255, 0.32); }
+
+/* Nota periodo dati */
+.sched-note {
+  padding: 8px 18px;
+  font-size: 11px;
+  color: #6b5b82;
+  background: #f6f0fb;
+  border-bottom: 1px solid #ece3f5;
+  flex: 0 0 auto;
+}
+
+/* Corpo scrollabile con i tabelloni */
+.sched-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 16px 18px 24px;
+}
+
+.sched-empty {
+  padding: 40px 16px;
+  color: #8a7a9c;
+  text-align: center;
+  font-size: 14px;
+}
+
+/* Blocco di una linea (intestazione + tabelloni feriale/festivo) */
+.board-line {
+  margin-bottom: 26px;
+}
+.board-line:last-child { margin-bottom: 6px; }
+
+.board-line-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #efe6f6;
+}
+.board-line-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.14);
+}
+.board-line-num {
+  font-size: 20px;
+  font-weight: 800;
+  color: #4a1d63;
+}
+.board-line-dest {
+  font-size: 13px;
+  color: #6b5b82;
+  word-break: break-word;
+}
+
+/* PATCH-LUCA "per-shape-day-select": select del giorno del singolo tabellone.
+   Variante CHIARA (il board-line-head e' su sfondo bianco); spinto a destra. */
+.board-line-dayselect {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  margin-left: auto;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: #4a1d63;
+  background-color: #f4edfa;
+  border: 1px solid #d9c8ea;
+  border-radius: 999px;
+  padding: 5px 26px 5px 12px;
+  cursor: pointer;
+  outline: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M2 4 L6 8 L10 4' fill='none' stroke='%234a1d63' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 9px center;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.board-line-dayselect:hover {
+  background-color: #ece0f6;
+  border-color: #c3aede;
+}
+.board-line-dayselect option {
+  color: #2b2340;
+  background: #fff;
+}
+.board-line-dayselect option:disabled {
+  color: #b3a9c2;
+}
+/* Avviso quando il percorso non circola nel giorno scelto per quel tabellone. */
+.board-day-empty {
+  margin: 8px 0 4px;
+  padding: 12px 14px;
+  font-size: 13px;
+  font-style: italic;
+  color: #8a7ba0;
+  background: #f7f3fb;
+  border: 1px dashed #d9c8ea;
+  border-radius: 10px;
+}
+
+/* ============================================================
+   FIX-LUCA "board-index-chips": INDICE delle linee/percorsi in cima
+   all'overlay orari. Card cliccabili (pallino livrea + linea + capolinea),
+   disposte 5 per riga (poi a capo). Cliccando una card, .sched-body scorre
+   fino al tabellone corrispondente (id="board-<key>").
+   ============================================================ */
+.board-index {
+  margin-bottom: 22px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid #efe6f6;
+}
+.board-index-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #8a5ea6;
+  margin-bottom: 10px;
+}
+/* PATCH-LUCA "board-index-counts" (v2 chip riquadrate): riepilogo numerico
+   Lines / Shapes sotto il titolo "Linee & percorsi disponibili". Ora ogni voce
+   e' una CHIP con riquadro proprio (bordo + sfondo viola tenue), piu' grande,
+   coerente con la tabella frequenze. */
+.board-index-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.board-index-count {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 8px 14px;
+  font-size: 13px;
+  color: #6b5b82;
+  letter-spacing: 0.02em;
+  background: #faf6fd;
+  border: 1px solid #e4d8ef;
+  border-radius: 10px;
+}
+.board-index-count b {
+  font-size: 17px;
+  font-weight: 800;
+  color: #4a1d63;
+  margin-left: 0;
+  font-variant-numeric: tabular-nums;
+}
+/* PATCH-LUCA "stop-frequency-stats" (v3 tabella): vera tabella pulita, larga al
+   massimo il 50% dello spazio disponibile, staccata dai pulsanti sotto. */
+.freq-stats {
+  width: auto;
+  max-width: 72%;
+  border-collapse: separate;
+  border-spacing: 0;
+  margin-top: 10px;
+  margin-bottom: 16px;
+  font-size: 13.5px;
+  background: #faf6fd;
+  border: 1px solid #e4d8ef;
+  border-radius: 10px;
+  overflow: hidden;
+}
+.freq-stats th,
+.freq-stats td {
+  padding: 8px 16px;
+  text-align: center;
+  border-bottom: 1px solid #efe6f6;
+  border-right: 1px solid #efe6f6;
+  white-space: nowrap;
+}
+.freq-stats tr:last-child th,
+.freq-stats tr:last-child td { border-bottom: none; }
+.freq-stats th:last-child,
+.freq-stats td:last-child { border-right: none; }
+/* Intestazioni di colonna (Feriale / Festiva) */
+.freq-stats thead th {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #8a5ea6;
+  background: #f3e9fa;
+}
+/* Angolo in alto a sinistra + intestazioni di riga (Oraria / Giornaliera) */
+.freq-stats .freq-stats-corner {
+  text-align: left;
+  color: #6b5b82;
+  background: #f3e9fa;
+}
+.freq-stats .freq-stats-rowhead {
+  text-align: left;
+  font-weight: 500;
+  color: #6b5b82;
+  background: #fbf7fd;
+}
+/* Valori numerici */
+.freq-stats tbody td {
+  font-weight: 800;
+  color: #4a1d63;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 640px) {
+  .freq-stats { max-width: 100%; }
+}
+/* Griglia FISSA a 5 colonne: 5 card per riga, poi va a capo. */
+.board-index-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+/* Su modale stretto (responsive) riduco il numero di colonne. */
+@media (max-width: 720px) {
+  .board-index-grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 480px) {
+  .board-index-grid { grid-template-columns: repeat(2, 1fr); }
+}
+/* Singola card dell'indice: pallino + testo (linea sopra, capolinea sotto). */
+.board-index-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid #e4d8ef;
+  border-radius: 8px;
+  background: #faf6fd;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: #3a2d4c;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s, box-shadow 0.15s;
+}
+.board-index-chip:hover {
+  background: #fff;
+  border-color: #b98fd0;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(83, 0, 108, 0.12);
+}
+.board-index-chip:active { transform: translateY(0); }
+.board-index-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.14);
+}
+.board-index-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.15;
+}
+.board-index-line {
+  font-size: 14px;
+  font-weight: 800;
+  color: #4a1d63;
+}
+.board-index-dest {
+  font-size: 10px;
+  color: #6b5b82;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Un tabellone per tipo-giorno */
+.board-day {
+  margin-bottom: 14px;
+}
+.board-day-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #8a5ea6;
+  margin-bottom: 6px;
+}
+
+/* ============================================================
+   FIX-LUCA "route-strip-v2": BARRA PERCORSO scorrevole (max 12 fermate).
+   Struttura:
+     .route-strip           = riga [freccia <] [viewport] [freccia >]
+       .route-strip-viewport = finestra con overflow-x:auto (mostra 12 fermate)
+         .route-strip-track   = pista larga N*(1/12) (una "slot" per fermata)
+           .route-strip-line  = linea orizzontale che attraversa tutte le fermate
+           .route-stop        = colonna larga 1/12 del viewport (pallino + nome)
+   Ogni nome (inclinato 45deg) e' ancorato al CENTRO del suo pallino, cosi'
+   parte esattamente da sotto il pallino corrispondente. Con <= 12 fermate la
+   pista riempie il viewport (niente scroll, niente frecce). Con > 12 fermate
+   la pista eccede il viewport e si scorre con le frecce  <  > .
+   ============================================================ */
+.route-strip {
+  margin: 2px 0 14px;
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  /* larghezza di 1 fermata = 1/12 dello spazio disponibile per il viewport */
+}
+
+/* Frecce di scorrimento (visibili solo con > 12 fermate) */
+.route-nav {
+  flex: 0 0 auto;
+  align-self: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid #d8c8e6;
+  border-radius: 50%;
+  background: #faf6fd;
+  color: #7a1fa2;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
+  box-shadow: 0 1px 3px rgba(83, 0, 108, 0.12);
+}
+.route-nav:hover {
+  background: #7a1fa2;
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(83, 0, 108, 0.28);
+}
+.route-nav:active { transform: scale(0.9); }
+
+/* Finestra scorrevole: mostra al massimo 12 fermate; oltre, scroll orizzontale */
+.route-strip-viewport {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  /* riservo spazio verticale per la linea + pallini + nomi inclinati */
+  padding-top: 20px;
+  /* nascondo la scrollbar nativa (lo scroll avviene con le frecce) */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.route-strip-viewport::-webkit-scrollbar { height: 0; display: none; }
+
+/* Pista: se <=12 fermate riempie il viewport (min-width:100%); se >12 diventa
+   piu' larga del viewport (ogni fermata occupa 1/12 di larghezza viewport). */
+.route-strip-track {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  /* FIX-LUCA "route-line-full-width": la pista deve essere larga quanto la
+     SOMMA delle fermate (non limitata al viewport), cosi' la linea assoluta
+     figlia (width:100%) la copre tutta anche scorrendo. Con >12 fermate le
+     larghezze fisse (1/12) sommano oltre il 100% e width:max-content espande
+     il track. Con <=12 fermate min-width:100% lo fa comunque riempire. */
+  width: max-content;
+  min-width: 100%;
+}
+/* Se ci sono <=12 fermate, la pista NON deve scrollare e le fermate si
+   distribuiscono su tutta la larghezza: la classe --scroll (settata in TS
+   quando >12) attiva la larghezza fissa per fermata. */
+.route-strip:not(.route-strip--scroll) .route-stop {
+  flex: 1 1 0;   /* <=12: dividono equamente lo spazio del viewport */
+}
+.route-strip--scroll .route-stop {
+  /* >12: ogni fermata ha larghezza FISSA in px cosi' ne stanno ~12 nel
+     viewport tipico (~760px -> ~63px) e le altre vanno in overflow scorrevole.
+     Uso px (non %) perche' il track e' width:max-content: una % creerebbe una
+     dipendenza circolare. La linea (figlia absolute width:100% del track)
+     copre l'intera pista, quindi resta visibile scorrendo. */
+  flex: 0 0 auto;
+  width: 63px;
+}
+
+/* Linea orizzontale che attraversa tutte le fermate (dietro ai pallini).
+   FIX-LUCA "route-line-full-width": la linea e' figlia di .route-strip-track
+   (che e' larga quanto TUTTA la pista, non solo il viewport). Uso width:100%
+   della track (NON right:0, che la limitava alla larghezza visibile del
+   viewport facendola "sparire" quando si scorreva). Cosi' la linea segue le
+   fermate anche scorrendo a destra. */
+.route-strip-line {
+  position: absolute;
+  top: 3px;           /* allineata al centro verticale dei pallini */
+  left: 0;
+  width: 100%;        /* = intera larghezza della pista scorrevole */
+  height: 3px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #b98fd0, #7a1fa2);
+  z-index: 0;
+}
+
+/* Colonna di una fermata: pallino in alto (agganciato alla linea) + nome
+   inclinato che parte ESATTAMENTE sotto il pallino. */
+.route-stop {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;   /* il pallino sta al centro della colonna */
+  height: 96px;
+  z-index: 1;
+}
+/* Pallino della fermata, centrato in cima alla colonna, sopra la linea */
+.route-stop-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #c9a9de;
+  border: 1.5px solid #fff;
+  box-shadow: 0 0 0 1.5px #b98fd0;
+  flex: 0 0 auto;
+  transition: transform 0.15s, background 0.15s, box-shadow 0.15s;
+}
+/* Nome fermata: INCLINATO a 45deg, ANCORATO al centro-in-basso del pallino.
+   Uso position:absolute + left:50% (= centro colonna = centro pallino) e
+   transform-origin:left top cosi' la rotazione parte dal punto sotto il
+   pallino e il testo scende in diagonale verso destra. */
+.route-stop-name {
+  position: absolute;
+  top: 12px;          /* poco piu' in basso del pallino */
+  left: 50%;          /* centro della colonna = sotto il pallino */
+  margin-left: -1px;  /* micro-correzione per far partire il testo esattamente sotto il pallino */
+  font-size: 9px;
+  line-height: 1.1;
+  color: #6b5b82;
+  white-space: nowrap;
+  transform: rotate(45deg);
+  transform-origin: left top;   /* ancorato al punto sotto il pallino */
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+/* Fermate PRIMA della cliccata: attenuate (la tratta parte dalla cliccata) */
+.route-stop.passed .route-stop-name { color: #b8a9c6; }
+.route-stop.passed .route-stop-dot  { background: #e2d4ee; box-shadow: 0 0 0 1.5px #d8c8e6; }
+/* Fermata CLICCATA: evidenziata (pallino viola pieno ingrandito + nome bold) */
+.route-stop.focus .route-stop-dot {
+  background: #7a1fa2;
+  box-shadow: 0 0 0 2px #7a1fa2, 0 0 0 4px rgba(122, 31, 162, 0.25);
+  transform: scale(1.35);
+}
+.route-stop.focus .route-stop-name {
+  color: #7a1fa2;
+  font-weight: 800;
+}
+
+
+
+/* Scroll orizzontale del tabellone (molte corse = molte colonne) */
+.board-scroll {
+  overflow-x: auto;
+  border: 1px solid #ece3f5;
+  border-radius: 8px;
+}
+.board-scroll::-webkit-scrollbar { height: 8px; }
+.board-scroll::-webkit-scrollbar-thumb {
+  background: #d8c8e6;
+  border-radius: 4px;
+}
+
+.board-table {
+  border-collapse: collapse;
+  width: max-content;
+  min-width: 100%;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Riga = fermata */
+.board-tr {
+  border-bottom: 1px solid #f2ecf7;
+}
+.board-tr:last-child { border-bottom: none; }
+
+/* Prima colonna: nome fermata (indice di riga), sticky a sinistra */
+.board-stopname {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: #faf6fd;
+  text-align: left;
+  font-weight: 500;
+  font-size: 12px;
+  color: #4a3d5c;
+  padding: 7px 12px;
+  white-space: nowrap;
+  border-right: 2px solid #ece3f5;
+  min-width: 160px;
+  max-width: 230px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Celle orario */
+.board-time {
+  padding: 7px 10px;
+  text-align: center;
+  font-size: 12px;
+  color: #3a2d4c;
+  white-space: nowrap;
+  border-left: 1px solid #f4eef9;
+}
+
+/* Riga della fermata cliccata: EVIDENZIATA (grassetto + sfondo viola) */
+.board-tr.focus .board-stopname {
+  background: #7a1fa2;
+  color: #fff;
+  font-weight: 800;
+}
+.board-tr.focus .board-time {
+  background: #f0e2f8;
+  color: #4a1069;
+  font-weight: 800;
+}
+
+/* Zebra leggera sulle righe non-focus per leggibilita' */
+.board-tr:nth-child(even):not(.focus) .board-time { background: #fcfaff; }
+
+/* Responsive: su schermi piccoli il modale diventa quasi fullscreen */
+@media (max-width: 640px) {
+  .sched-modal {
+    width: 100vw;
+    max-width: 100vw;
+    height: 100vh;
+    max-height: 100vh;
+    border-radius: 0;
+    top: 0; left: 0;
+    transform: none;
+  }
+  .sched-modal.open { transform: none; }
+  .sched-head { flex-wrap: wrap; }
+  .sched-weeknav { order: 3; width: 100%; justify-content: center; }
+}
+
+
+
+/* PATCH-LUCA "stop-stats-single-row-v2" (2026-07-27):
+   Riepilogo su UNA SOLA riga sotto "Available lines & routes".
+   - blocco largo il 90% dello spazio (5% margine per lato);
+   - ogni voce ha larghezza UGUALE (flex:1) e insieme riempiono il 100% del blocco;
+   - SEMPRE su una riga, MAI a capo (flex-wrap:nowrap) su qualsiasi monitor;
+   - ogni voce: NOME sopra (piccolo, maiuscolo), NUMERO sotto in grassetto,
+     unita' di misura piccola e NON in grassetto. */
+.board-index-stats {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  width: 100%;
+  margin: 18px 0 24px;     /* piu' spazio sopra e sotto, nessun margine laterale */
+  gap: 0;
+}
+.bstat {
+  flex: 1 1 0;
+  min-width: 0;            /* consente il restringimento senza andare a capo */
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0 8px;
+  text-align: center;
+  overflow: hidden;
+}
+/* Divisore sottile tra le voci (tranne l'ultima) */
+.bstat + .bstat {
+  border-left: 1px solid #ece0f4;
+}
+.bstat-label {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #8a5ea6;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bstat-value {
+  font-size: 17px;
+  font-weight: 800;
+  color: #4a1d63;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.bstat-unit {
+  font-size: 10px;
+  font-weight: 400;
+  color: #8a5ea6;
+  margin-left: 1px;
+}
+
+
+/* ============================================================
+   PATCH-LUCA "freq-shape-select" (2026-07-28, richiesta Luca):
+   Info-box che compare in alto a sinistra sulla mappa quando si
+   clicca una shape in "Heatmap frequency". Mostra frequency +
+   attributi della shape e l'elenco delle linee del corridoio.
+   ============================================================ */
+.freq-info-box {
+  position: absolute;
+  bottom: 14px;
+  left: 14px;
+  z-index: 1000;
+  width: 250px;
+  max-height: calc(100% - 28px);
+  overflow-y: auto;
+  background: rgba(255, 255, 255, 0.97);
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+  padding: 14px 14px 12px;
+  font: 13px/1.4 system-ui, "Segoe UI", Roboto, sans-serif;
+  color: #1f2937;
+}
+.freq-info-close {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  border: none;
+  background: transparent;
+  font-size: 20px;
+  line-height: 1;
+  color: #9ca3af;
+  cursor: pointer;
+  padding: 0;
+}
+.freq-info-close:hover { color: #4b5563; }
+.freq-info-title {
+  font-weight: 700;
+  font-size: 15px;
+  color: #111827;
+  margin: 0 20px 2px 0;
+}
+/* PATCH-LUCA "freq-info-shape-name": shape_id piccolo sotto il nome shape. */
+.freq-info-subid {
+  font-size: 11px;
+  color: #9ca3af;
+  margin: 0 0 8px 0;
+  letter-spacing: 0.02em;
+}
+.freq-info-freq {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.freq-info-freq-num {
+  font-size: 28px;
+  font-weight: 800;
+  /* PATCH-LUCA "freq-num-black" (richiesta Luca): il numero delle corse nero */
+  color: #000000;
+  line-height: 1;
+}
+.freq-info-freq-unit {
+  font-size: 11px;
+  /* PATCH-LUCA "freq-unit-black" (richiesta Luca): "trips on this segment" nero */
+  color: #000000;
+}
+.freq-info-rows { margin-bottom: 10px; }
+.freq-info-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 2px 0;
+}
+.freq-info-label { color: #6b7280; }
+.freq-info-val {
+  color: #111827;
+  font-weight: 600;
+  text-align: right;
+}
+.freq-info-lines-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .4px;
+  color: #6b7280;
+  margin: 4px 0 6px;
+}
+.freq-info-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+/* PATCH-LUCA "freq-info-lines-named-colored": ogni linea e' una RIGA con un
+   pallino del colore della sua livrea + il nome della linea. */
+.freq-info-line-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: #1f2937;
+  line-height: 1.3;
+}
+.freq-info-line-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+.freq-info-line-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+
+/* ============================================================
+   PATCH-LUCA "freq-raster-overlay" (richiesta Luca):
+   Legenda a GRADIENTE del raster "Heatmap frequency".
+   Barra orizzontale bianco->rosso scuro + etichette min/max
+   ("meno passaggi" a sinistra, "piu' passaggi" a destra).
+   ============================================================ */
+.freq-raster-legend {
+  margin-top: 6px;
+}
+.freq-raster-bar {
+  height: 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.4);
+}
+.freq-raster-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  font-size: 11px;
+  color: #6b7280;
+}
+.freq-raster-labels span:last-child {
+  font-weight: 600;
+  color: #7a0011;
+}
+
+
+/* PATCH-LUCA "freq-raster-smooth-rendering":
+   Forza l'interpolazione LISCIA del PNG della Heatmap frequency quando Leaflet
+   lo scala in fase di zoom. Senza questo, in certi zoom il browser puo'
+   renderizzare l'imageOverlay "a blocchi" (image-rendering: pixelated ereditato
+   o auto-detect del browser), facendo apparire le linee SCALETTATE anche se il
+   PNG e' antialiasato. image-rendering:auto (+ i vari prefissi) ripristina lo
+   smoothing bilineare/lanczos del browser. Non tocca il PNG ne' la geometria. */
+img.freq-raster-smooth,
+.freq-raster-smooth {
+  image-rendering: auto !important;
+  image-rendering: smooth !important;
+  image-rendering: high-quality !important;
+  -ms-interpolation-mode: bicubic;
+  /* PATCH-LUCA "freq-raster-img-no-gesture-2026-08-05" (FIX ZOOM PINCH):
+     CAUSA VERA del bug "col pinch sopra Heatmap frequency zooma tutta la
+     dashboard": il layer e' un <img> (L.imageOverlay). Il browser sul pinch
+     interpreta il gesto come ZOOM/DRAG DELL'IMMAGINE (o zoom-pagina), invece
+     che come zoom della mappa Leaflet -> ingrandisce la dashboard. Sugli
+     altri layer (vettoriali SVG/canvas) questo NON accade e il pinch zooma
+     la mappa normalmente.
+     FIX: rendo il PNG "trasparente ai gesti/puntatore":
+       - pointer-events:none  -> il gesto attraversa l'immagine e arriva alla
+         mappa Leaflet sotto, che lo gestisce come zoom mappa (come gli altri
+         layer). L'imageOverlay e' gia' interactive:false, quindi non perde
+         funzionalita' (non era cliccabile; il click sulle celle e' su un
+         layer separato sopra).
+       - user-select:none / -webkit-user-drag:none -> impediscono al browser
+         di "afferrare" e trascinare/zoomare l'IMMAGINE come oggetto.
+       - touch-action:none -> nessun gesto touch nativo sull'immagine.
+     Cosi' il pinch sopra la heatmap zooma la MAPPA come su ogni altro layer. */
+  pointer-events: none !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -webkit-user-drag: none !important;
+  -khtml-user-drag: none !important;
+  touch-action: none !important;
+}
+
+
+/* PATCH-LUCA "grid5m-raster-thicker-2026-08-24" (richiesta Luca): da lontano e
+   medio-lontano le strade della heatmap 5x5 (PNG) si vedevano poco/sottili.
+   Questa classe le ingrossa VISIVAMENTE senza rigenerare il PNG:
+   - contrast/saturate: rende i colori piu' pieni e le strade piu' marcate;
+   - drop-shadow leggero in tutte le direzioni: simula un "ispessimento" del
+     tratto (alone dello stesso colore) cosi' le linee sottili sembrano piu'
+     grosse a zoom lontano. E' una prova: se troppo/poco si regola qui. */
+.grid5m-raster-bold {
+  image-rendering: auto;
+  filter:
+    saturate(1.25) contrast(1.15)
+    drop-shadow(0.6px 0 0 rgba(150, 0, 12, 0.55))
+    drop-shadow(-0.6px 0 0 rgba(150, 0, 12, 0.55))
+    drop-shadow(0 0.6px 0 rgba(150, 0, 12, 0.55))
+    drop-shadow(0 -0.6px 0 rgba(150, 0, 12, 0.55));
+}
+
+
+/* PATCH-LUCA "grid5m-loading-spinner-2026-08-24" (richiesta Luca): overlay con
+   rotella + testo "Loading grid…" mostrato mentre, passando dal PNG ai
+   quadratini 5x5, le tessere non sono ancora caricate. Centrato sulla mappa,
+   sopra a tutto, ma non cliccabile (pointer-events:none). */
+.grid5m-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1200;               /* sopra le tile Leaflet, sotto ai dropdown */
+  pointer-events: none;        /* non blocca pan/zoom della mappa */
+}
+.grid5m-loading-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #333;
+  padding: 10px 16px;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  font-size: 14px;
+  font-weight: 600;
+}
+.grid5m-spinner {
+  width: 18px;
+  height: 18px;
+  border: 3px solid rgba(150, 0, 12, 0.25);
+  border-top-color: #96000c;   /* stesso rosso della heatmap */
+  border-radius: 50%;
+  animation: grid5m-spin 0.8s linear infinite;
+  flex: 0 0 auto;
+}
+.grid5m-loading-text { white-space: nowrap; }
+@keyframes grid5m-spin {
+  to { transform: rotate(360deg); }
+}
+
+
+/* PATCH-LUCA "initial-loading-overlay-2026-09-14" (richiesta Luca): rotella di
+   caricamento INIZIALE sulla mappa, stile IDENTICO alle altre dashboard (box
+   quadrato bianco semitrasparente + spinner viola + scritta "Loading").
+   Overlay position:absolute DENTRO #map (che e' position:relative), quindi copre
+   SOLO la mappa e NON tutta la pagina, come le altre dashboard. Si nasconde con
+   la classe .is-hidden (fade-out) quando initialLoading diventa false. */
+#loadingOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1300;              /* sopra tile e grid5m-loading, sotto ai modali */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.92);
+  transition: opacity .4s ease;
+}
+#loadingOverlay.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+#loadingOverlay .loading-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+#loadingOverlay .loading-spinner {
+  width: 52px;
+  height: 52px;
+  border: 5px solid #e2d6ec;
+  border-top-color: #7a2e96;
+  /* PATCH-LUCA "initial-loading-square-spinner-2026-09-14" (richiesta Luca):
+     la ROTELLA deve essere QUADRATA (angoli NON arrotondati), non un cerchio:
+     rimosso border-radius:50% -> lo spinner e' un quadrato che ruota. */
+  border-radius: 0;
+  animation: loadingSpin 0.9s linear infinite;
+}
+#loadingOverlay .loading-text {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: .3px;
+  color: #6b1f87;
+}
+@keyframes loadingSpin {
+  to { transform: rotate(360deg); }
+}
+
+
+/* PATCH-LUCA "heatmap-raster-pixelated": il layer "Heatmap raster" deve
+   mostrare i QUADRETTI VERI del raster .tif SENZA sfocatura a ogni zoom.
+   La classe 'freq-raster-smooth' forzava image-rendering morbido -> sfocato.
+   Qui invece forzo image-rendering: pixelated cosi' il browser NON interpola
+   e disegna i pixel esatti del PNG (quadretti netti) a qualsiasi livello di
+   zoom. Restano immagine (imageOverlay), come richiesto. */
+.heatmap-raster-pixelated {
+  image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
+}
+
+
+/* ──────────────────────────────────────────────────────────────
+   PATCH-LUCA "heatmap-freq-road-threshold-legend" (2026-08-28):
+   Legenda del layer "Heatmap frequency" (id heatmap_raster) rifatta a SOGLIE:
+   per ogni fascia di frequenza (FREQ_LEGEND) una "strada" tratteggiata (linea a
+   trattini --) del colore della soglia + a fianco nome fascia e range.
+   Stile coerente con .tier-* / .line-* della sidebar.
+   La "strada" e' un <span> con background repeating-linear-gradient (trattini)
+   impostato inline dal template (colore della fascia).
+   ────────────────────────────────────────────────────────────── */
+.freq-road-legend {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.freq-road-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+/* La "strada" tratteggiata: linea a trattini del colore della soglia */
+.freq-road-line {
+  width: 34px;
+  height: 5px;
+  border-radius: 2px;
+  flex-shrink: 0;
+  /* il background (repeating-linear-gradient coi trattini colorati) e'
+     impostato inline dal template in base al colore della fascia */
+}
+.freq-road-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+.freq-road-name {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+.freq-road-desc {
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+}
+
+
+/* ============================================================
+   PATCH-LUCA "stop-info-panel-4numbers" (2026-09-02)
+   Griglia 2x2 con i 4 numeri della fermata (Lines / Shapes /
+   Avg frequency hourly / Weekly avg passages) mostrata nel
+   pannello che si apre al click su una fermata.
+   ============================================================ */
+.stopinfo-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  padding: 8px 4px 4px;
+}
+.stopinfo-cell {
+  background: #f5f7fa;
+  border: 1px solid #e3e8ef;
+  border-radius: 10px;
+  padding: 16px 14px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  justify-content: center;
+}
+.stopinfo-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .02em;
+  color: #5b6b7c;
+  text-transform: uppercase;
+}
+.stopinfo-value {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1;
+  color: #1f2d3d;
+}
+.stopinfo-unit {
+  font-size: 13px;
+  font-weight: 400;
+  color: #7a8794;
+}
+
+
+/* ============================================================
+   PATCH-LUCA "stop-info-panel-style-2026-01-09" (richiesta Luca):
+   Stile del PANNELLO INFO FERMATA (box che si apre al click su una fermata).
+   Prima mancava del tutto il CSS delle classi .si-* -> il contenuto appariva
+   come "HTML puro" senza struttura ne' indentazione, dentro un modale enorme
+   (860x82vh, dimensionato per i vecchi tabelloni). Ora:
+     - .sched-modal--stopinfo: il modale diventa COMPATTO e PROPORZIONALE al
+       contenuto (larghezza piccola, altezza automatica con cap), non piu' fisso.
+     - .si-lines: elenco linee; ogni linea (.si-line-row) ha il nome e SOTTO,
+       INDENTATE, le sue shape (capolinea) come:
+          line 12
+              — Cristo Rey
+              — Moncloa
+       con la lineetta del colore reale della linea.
+     - .si-stats: i 2 box (freq oraria + passaggi settimanali) sotto l'elenco.
+   ============================================================ */
+
+/* Modale in modalita' "info fermata": compatto, cresce solo quanto serve. */
+.sched-modal.sched-modal--stopinfo {
+  width: 360px;
+  max-width: 92vw;
+  height: auto;                 /* altezza naturale = proporzionale ai dati */
+  max-height: 80vh;             /* oltre, il corpo scrolla */
+  max-width: 360px;
+}
+/* PATCH-LUCA "stopinfo-head-white-2026-11-09" (richiesta Luca):
+   SOLO nel pannello info-fermata (.sched-modal--stopinfo) l'header NON e' piu'
+   viola pieno: e' BIANCO con le scritte VIOLA (colore dashboard #53006c). Un
+   sottile filo viola chiaro sotto lo separa dal corpo. Nome fermata sottolineato
+   e cliccabile (link allo stop_url); sotto "stop id: (id)". Le frecce settimana
+   e il pulsante chiudi passano da bianchi a viola per restare visibili su bianco. */
+.sched-modal.sched-modal--stopinfo .sched-head {
+  padding: 12px 16px;
+  background: #ffffff;
+  color: #53006c;
+  border-bottom: 1px solid #ece3f5;
+}
+.sched-modal.sched-modal--stopinfo .sched-stop-name {
+  font-size: 15px;
+  color: #53006c;
+  text-decoration: underline;   /* nome fermata SEMPRE sottolineato */
+  text-underline-offset: 2px;
+}
+/* Variante link del nome fermata: cliccabile, colore viola dashboard. */
+.sched-modal.sched-modal--stopinfo a.sched-stop-name--link {
+  display: inline-block;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+.sched-modal.sched-modal--stopinfo a.sched-stop-name--link:hover {
+  color: #6b2a85;
+}
+/* "stop id: (id)" sotto il nome, viola tenue. */
+.sched-modal.sched-modal--stopinfo .sched-stop-id {
+  color: #7a3a8a;
+  opacity: 1;
+}
+/* Frecce settimana + chiudi: su header bianco diventano viola (con hover tenue). */
+.sched-modal.sched-modal--stopinfo .sched-arrow {
+  background: rgba(83, 0, 108, 0.10);
+  color: #53006c;
+}
+.sched-modal.sched-modal--stopinfo .sched-arrow:hover:not(:disabled) {
+  background: rgba(83, 0, 108, 0.20);
+}
+.sched-modal.sched-modal--stopinfo .sched-weeklabel-top,
+.sched-modal.sched-modal--stopinfo .sched-weeklabel-main {
+  color: #53006c;
+}
+.sched-modal.sched-modal--stopinfo .sched-close {
+  background: rgba(83, 0, 108, 0.10);
+  color: #53006c;
+}
+.sched-modal.sched-modal--stopinfo .sched-close:hover {
+  background: rgba(83, 0, 108, 0.20);
+}
+.sched-modal.sched-modal--stopinfo .sched-stop-name {
+  font-size: 15px;
+}
+.sched-modal.sched-modal--stopinfo .sched-body {
+  padding: 14px 16px 16px;
+}
+
+/* Contenitore del pannello info */
+.stopinfo-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* --- Elenco linee (con shape indentate sotto ciascuna linea) --- */
+.si-lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  /* se ci sono molte linee, scrolla solo questa parte, non tutto il box */
+  max-height: 46vh;
+  overflow-y: auto;
+}
+.si-line-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+/* Nome linea: "- linea 12" con trattino colorato DAVANTI al nome linea */
+.si-line-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #4a1d63;
+  letter-spacing: 0.01em;
+}
+/* Trattino del colore della linea, davanti al NOME della linea */
+.si-line-dash {
+  width: 18px;
+  height: 4px;
+  border-radius: 2px;
+  flex: 0 0 auto;
+  box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.30);
+}
+/* PATCH-LUCA "stopinfo-line-url-2026-11-09" (richiesta Luca):
+   Quando una linea ha un url (route_url del feed GTFS, aggiunto a line_list
+   dalla pipeline), il nome "linea N" diventa un LINK cliccabile che apre la
+   pagina della linea in una nuova scheda. Stile coerente col nome linea
+   (.si-line-name: stesso viola #4a1d63, grassetto): sottolineato all'hover,
+   colore che vira al viola dashboard. Se la linea non ha url resta testo
+   semplice (nessuna regola cambia per quel caso). */
+.si-line-link {
+  color: #4a1d63;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 0.15s ease, text-decoration-color 0.15s ease;
+}
+.si-line-link:hover {
+  color: #7a1fa2;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+/* Ogni shape (capolinea) su una riga, INDENTATA sotto la linea, solo testo */
+.si-shape {
+  display: block;
+  margin-left: 26px;           /* INDENTAZIONE: rientra sotto il nome linea */
+  font-size: 12px;
+  color: #5b4a6e;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --- I 2 box statistiche (freq oraria + passaggi settimanali) ---
+   PATCH-LUCA "stopinfo-stats-on-top": ora stanno SOPRA l'elenco linee, quindi
+   il divisore va SOTTO (border-bottom) invece che sopra. */
+.si-stats {
+  display: flex;
+  gap: 10px;
+  padding-bottom: 12px;
+  border-bottom: 1px dashed #e4d8ef;
+}
+.si-stat-box {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  background: #faf6fd;
+  border: 1px solid #e4d8ef;
+  border-radius: 10px;
+  text-align: center;
+}
+.si-stat-label {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #8a5ea6;
+  line-height: 1.2;
+}
+.si-stat-value {
+  font-size: 20px;
+  font-weight: 800;
+  color: #4a1d63;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+}
+.si-stat-unit {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8a5ea6;
+}
+
+/* Scrollbar sottile per l'elenco linee (coerente col resto del box) */
+.si-lines::-webkit-scrollbar { width: 6px; }
+.si-lines::-webkit-scrollbar-thumb { background: #d8c8e6; border-radius: 3px; }
+
+/* Su schermi piccoli il modale info resta comodo ma non fullscreen forzato:
+   annullo la regola @media(max-width:640px) globale (che lo rendeva 100vw/100vh)
+   per la sola variante stopinfo, cosi' resta un box compatto anche su mobile. */
+@media (max-width: 640px) {
+  .sched-modal.sched-modal--stopinfo {
+    width: 92vw;
+    max-width: 92vw;
+    height: auto;
+    max-height: 82vh;
+    border-radius: 14px;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.96);
+  }
+  .sched-modal.sched-modal--stopinfo.open {
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+
+/* PATCH-LUCA "coverage-thematize-uncovered-2026-08-09" (richiesta Luca):
+   Toggle "Thematize by population uncovered" nella legenda del layer
+   Population coverage. E' un vero INTERRUTTORE (switch): riusa lo stile
+   .thematize-toggle/.thematize-switch/.thematize-knob gia' usato dalla
+   legenda "Transport stop". Distanziato dalla legenda soprastante con un
+   filo di separazione; la scritta e' leggermente PIU' PICCOLA delle altre
+   (.coverage-uncovered-label) come richiesto. */
+.coverage-uncovered-toggle {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-light);
+}
+.coverage-uncovered-label {
+  /* PATCH-LUCA "coverage-uncovered-label-rev2" (richiesta Luca):
+     scritta piu' piccola, NON in grassetto e tutta su UNA riga. */
+  font-size: 0.72rem;
+  font-weight: 400;          /* niente grassetto (override di .thematize-label 600) */
+  white-space: nowrap;       /* tutto su una sola riga */
+}
+
+/* PATCH-LUCA "transport-opacity-slider-2026-09-09" (richiesta Luca):
+   Stile della barra di scorrimento (slider) dell'opacita' sotto la legenda
+   "Walking time (min)" della categoria Transport stop accessibility. Barra
+   orizzontale da 0 a 100% con etichetta "Opacity" a sinistra e la % a destra. */
+.opacity-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  /* PATCH-LUCA "transport-opacity-slider-spacing-2026-09-09" (richiesta Luca):
+     un po' di spazio SOTTO la barra cosi' non tocca il pulsante-layer
+     "Heatmap frequency" che sta subito sotto la legenda della categoria. */
+  margin-bottom: 10px;
+  width: 100%;
+}
+.opacity-slider-label {
+  font-size: 0.72rem;
+  color: #6b7280;
+  flex: 0 0 auto;
+}
+.opacity-slider {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: linear-gradient(to right, #cbb5e0, #7a1fa2);
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+}
+.opacity-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #7a1fa2;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+}
+.opacity-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #7a1fa2;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+}
+.opacity-slider-value {
+  font-size: 0.72rem;
+  color: #4b5563;
+  flex: 0 0 auto;
+  min-width: 34px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+
+/* ============================================================
+   PATCH-LUCA "stopinfo-stop-url-2026-10-09" (richiesta Luca):
+   Link della fermata (campo stop_url del feed GTFS) mostrato IN FONDO al
+   pannello info fermata, sotto l'elenco linee. Coerente con la palette viola
+   Deda: link viola sottolineato all'hover, staccato dall'elenco linee con un
+   filo tratteggiato sopra.
+   ============================================================ */
+.si-stop-url {
+  padding-top: 12px;
+  border-top: 1px dashed #e4d8ef;
+  text-align: center;
+}
+.si-stop-url a {
+  display: inline-block;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #7a1fa2;
+  text-decoration: none;
+  padding: 6px 14px;
+  border: 1px solid #e4d8ef;
+  border-radius: 999px;
+  background: #faf6fd;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  word-break: break-all;
+  max-width: 100%;
+}
+.si-stop-url a:hover {
+  background: #7a1fa2;
+  border-color: #7a1fa2;
+  color: #fff;
+  text-decoration: none;
+}
+
+
+/* ============================================================
+   PATCH-LUCA "livery-popup-line-link-like-stop-2026-11-09" (richiesta Luca):
+   Link "Line N" nel popup del TRACCIATO (layer Transport lines) reso IDENTICO
+   al link "linea N" del pannello fermata (.si-line-link):
+     - default: viola #4a1d63, grassetto, NON sottolineato;
+     - hover: viola #7a1fa2 + sottolineato (text-underline-offset 2px).
+   Il popup e' un L.popup con HTML iniettato FUORI dal componente Angular, quindi
+   il CSS scoped non lo raggiunge: uso ::ng-deep per applicare la regola in modo
+   GLOBALE al link .lz-line-link dentro il popup Leaflet (.lz-popup). Stessi
+   identici valori di .si-line-link, copiati pari pari. */
+::ng-deep .lz-popup .lz-line-link {
+  color: #4a1d63;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+  flex: 0 0 auto;
+  transition: color 0.15s ease, text-decoration-color 0.15s ease;
+}
+::ng-deep .lz-popup .lz-line-link:hover {
+  color: #7a1fa2;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+
+/* ============================================================
+   PATCH-LUCA "agency-url-clickable-2026-11-09" (richiesta Luca):
+   Nel KPI "Agencies" della tabella per-service-type, quando la cella ha un
+   url (agency_url letto da agency.txt), il valore (agency_id) diventa un LINK
+   cliccabile verso il sito ufficiale dell'agenzia (nuova scheda), come gia'
+   avviene per fermate e linee. Lo stile e' IDENTICO agli altri link della
+   dashboard (.si-line-link / .lz-line-link): viola #4a1d63 grassetto NON
+   sottolineato di default, all'HOVER vira al viola #7a1fa2 e si sottolinea.
+   La cella e' DENTRO il componente Angular (tabella .kpi-bymode-table), quindi
+   qui NON serve ::ng-deep: la regola scoped colpisce direttamente il link.
+   La classe .kpi-bymode-val mantiene grassetto/tabular-nums coerente con gli
+   altri valori della tabella; aggiungo solo il comportamento da link. */
+.kpi-bymode-val.lz-line-link {
+  color: #4a1d63;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 0.15s ease, text-decoration-color 0.15s ease;
+}
+.kpi-bymode-val.lz-line-link:hover {
+  color: #7a1fa2;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
